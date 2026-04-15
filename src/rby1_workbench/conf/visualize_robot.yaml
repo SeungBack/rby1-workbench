@@ -1,0 +1,22 @@
+robot:
+  address: "192.168.12.1:50051"
+  model: "m"
+  power: ".*"
+  servo: ".*"
+  auto_power_on: false
+  auto_servo_on: false
+  auto_enable_control_manager: false
+  unlimited_mode_enabled: false
+  state_update_hz: 10.0
+
+viz:
+  application_id: "rby1_visualize_robot"
+  spawn_viewer: true
+  world_frame: "world"
+  arrow_length_m: 0.08
+  log_robot_frames: true
+  log_head_frames: true
+  log_joint_scalars: true
+  log_skeletons: true
+  log_meshes: false
+  mesh_dir: null
