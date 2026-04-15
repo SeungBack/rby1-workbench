@@ -19,6 +19,7 @@ Current architecture:
 - `src/rby1_workbench/apps`: thin CLI/app entrypoints
 - `src/rby1_workbench/config`: structured config/dataclasses
 - `src/rby1_workbench/conf`: Hydra YAML configs
+- `src/rby1_workbench/control`: joint command builders and control-panel logic
 - `src/rby1_workbench/geometry`: SE3 and transform graph utilities
 - `src/rby1_workbench/robot`: robot connection, state buffering, naming, FK
 - `src/rby1_workbench/viz`: Rerun session and reusable viewer logic
@@ -29,6 +30,7 @@ Naming:
 - repository name: `rby1-workbench`
 - Python import package: `rby1_workbench`
 - console script: `rby1-visualize-robot`
+- console script: `rby1-viser-joint-control`
 
 Current implemented MVP:
 - Live robot state buffer
@@ -37,12 +39,18 @@ Current implemented MVP:
 - Rerun frame and skeleton visualization
 - Reusable `run_visualize_robot(...)` library function
 - CLI app `rby1-visualize-robot`
+- Joint command library for torso/arms/head
+- Viser joint control panel MVP
+- Joint command stream based interactive send path
+- Jog-button-based panel instead of large sliders
 
 Key design rules:
 - Frame-first: preserve a stable frame vocabulary such as `base`, `link_torso_*`, `link_right_arm_*`, `link_left_arm_*`, `link_head_*`, `ee_right`, `ee_left`.
 - Thin apps, thick library: reusable logic belongs in library modules, not inside CLI scripts.
 - Safe defaults: visualization/read-only apps must not power on, servo on, or enable control manager unless explicitly configured.
 - Prefer named interfaces over raw index slicing whenever possible.
+- Split input from visualization: `Rerun` for observing, `Viser` for interactive controls.
+- For interactive joint control, prefer jog/preset UX over large free-drag sliders.
 - Keep the package locally pip-installable.
 
 Documentation rules:
@@ -56,15 +64,17 @@ Documentation rules:
 Current priorities:
 1. Frame and transform correctness
 2. State visibility and debugging
-3. Calibration data flow
-4. Control abstraction
+3. Control abstraction
+4. Calibration data flow
 
 Likely next work:
 - Add tool/camera mount frames
+- Add EE target gizmo and cartesian impedance command flow
 - Add head camera calibration data structures
 - Add replay/logging structure
 - Split Hydra configs into groups
-- Migrate control examples into reusable library modules
+- Expand control examples into reusable library modules
+- Refine control-panel ergonomics and live feedback if needed
 
 Before making risky structural changes:
 - Check existing docs first.

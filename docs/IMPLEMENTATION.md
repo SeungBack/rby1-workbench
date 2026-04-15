@@ -12,6 +12,7 @@ Last updated: 2026-04-15
 - RB-Y1 link chain 기반 FK 계산
 - frame graph 구성
 - Rerun 기반 robot frame / skeleton 시각화
+- viser 기반 joint control panel MVP
 
 ## Implemented
 
@@ -29,6 +30,9 @@ Last updated: 2026-04-15
   - `RobotConfig`
   - `VizConfig`
   - `VisualizeRobotConfig`
+  - `ViserConfig`
+  - `JointControlConfig`
+  - `ViserJointControlAppConfig`
 
 ### Geometry
 
@@ -81,10 +85,43 @@ Last updated: 2026-04-15
   - 앱 로직을 재사용 가능한 library function으로 분리
   - no-state warning and stream diagnostics
 
+### Control
+
+- `rby1_workbench.control.joint_commands`
+  - component별 joint 이름/limit 조회
+  - position / joint impedance command builder
+  - shared command stream send path
+  - expired stream auto-recreate
+  - torso / arm / head target apply helper
+  - body/head minimum time 분리
+  - torso position-only behavior aligned with SDK teleoperation example
+  - arm velocity / acceleration limit injection for stream commands
+
+- `rby1_workbench.control.presets`
+  - `22_joint_impedance_control.py` 기준 ready pose preset
+  - model별 torso / arm 기본 자세 정의
+
+- `rby1_workbench.control.viser_joint_control`
+  - viser 기반 tabbed jog panel
+  - head 기본 활성화
+  - torso / arm opt-in
+  - component tab UI
+  - target number input
+  - per-component jog send
+  - direct callback-to-stream send path
+  - jog update 기반 command streaming
+  - ready pose button
+  - startup-only current pose sync
+  - SDK example 기준 default control parameter
+
+- `rby1_workbench.apps.viser_joint_control_panel`
+  - Hydra app entry point
+
 ### Examples
 
 - `examples/library_visualize_robot.py`
 - `examples/kinematics_snapshot.py`
+- `examples/library_viser_joint_control.py`
 
 ### Agent Handoff
 
@@ -93,10 +130,10 @@ Last updated: 2026-04-15
 
 ## Not Implemented Yet
 
-- URDF mesh visualization
 - tool / camera mount frame registration
 - head-eye calibration dataset pipeline
-- cartesian impedance / teleop app migration
+- cartesian impedance / EE target gizmo
+- teleop app migration
 - config group 분리
 - replay / recording pipeline
 
@@ -107,3 +144,4 @@ Last updated: 2026-04-15
 - `visualize_robot`는 현재 기본적으로 읽기 전용입니다.
 - power / servo / control manager enable은 명시적으로 config를 바꿨을 때만 수행됩니다.
 - 현재 viewer는 frame-first 디버깅을 목표로 합니다.
+- `viser_joint_control_panel`은 첫 control MVP이며, cartesian control은 아직 포함하지 않습니다.

@@ -74,6 +74,19 @@ import 기반 재사용이 가능하도록 유지합니다.
 
 이 원칙은 head control, calibration, logging까지 동일하게 적용합니다.
 
+### 5. Split Input and Visualization
+
+인터랙션 입력과 로봇 시각화는 같은 도구에 억지로 넣지 않습니다.
+
+- `Rerun`
+  관찰, frame 확인, mesh, target/error overlay
+- `Viser`
+  slider, button, 이후의 EE gizmo 같은 입력 UI
+- `control/`
+  실제 SDK command builder와 streaming 로직
+
+이렇게 나누면 제어 루프와 viewer 책임이 분명해지고, 나중에 cartesian target gizmo를 추가할 때도 구조가 덜 흔들립니다.
+
 ## Planned Extensions
 
 ### Calibration
@@ -95,9 +108,35 @@ import 기반 재사용이 가능하도록 유지합니다.
 추가 예정 모듈:
 
 - joint command presets
+- joint impedance wrappers
 - cartesian impedance wrappers
 - head command utilities
 - teleop app migration
+
+현재 첫 단계는 `viser joint slider panel -> control command builder` 경로를 먼저 안정화하는 것입니다.
+그 다음 단계에서 `EE target gizmo -> cartesian command stream`으로 확장합니다.
+
+초기 joint 제어 UX는 아래를 기본으로 둡니다.
+- SDK ready pose로 즉시 이동
+- 최소한의 head zero 기능
+- joint jog 버튼 기반의 작은 증분 조작
+
+즉, 사용자가 큰 slider를 끌다가 값이 튀는 패널이 아니라, 자주 쓰는 preset과 작은 jog 동작으로 안전하게 움직일 수 있게 유지합니다.
+
+기본 파라미터도 임의값보다 SDK example 경향을 따릅니다.
+- `body minimum_time`: `17`, `22` 예제를 따라 5초 기준
+- `head minimum_time`: `34` 예제를 따라 2초 기준
+- `stiffness`, `damping_ratio`, `torque_limit`: `17`의 teleoperation impedance 설정 기준
+- `control_hold_time`: stream 제어에서는 `17`을 따라 `1e6`
+
+component behavior도 `17` 예제 쪽을 우선 따릅니다.
+- torso는 항상 joint position command
+- arm은 position / impedance 전환 가능
+- stream 제어 arm command에는 velocity / acceleration limit를 함께 사용
+
+interactive panel은 완료 대기보다 반응성과 연속성을 우선합니다.
+- 모든 interactive 전송은 공용 `command_stream`을 사용하고
+- 별도 `Load current pose` 없이 시작 시 한 번만 현재 자세를 target으로 동기화합니다.
 
 ### Visualization
 

@@ -14,10 +14,12 @@ dependencies = [
     "omegaconf>=2.3",
     "rerun-sdk>=0.20",
     "rby1-sdk",
+    "viser",
 ]
 
 [project.scripts]
 rby1-visualize-robot = "rby1_workbench.apps.visualize_robot:cli"
+rby1-viser-joint-control = "rby1_workbench.apps.viser_joint_control_panel:cli"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
