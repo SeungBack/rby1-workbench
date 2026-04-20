@@ -87,6 +87,7 @@ class ViserJointControlPanel:
 
         self._stop_event = threading.Event()
         self._stream_on = bool(cfg.command.send_on_update)
+        self._body_ctrl_mode: str = "joint"  # "joint" | "cartesian"
         self._syncing_gui = False
         self._target_by_component = self._command_client.current_targets()
         self._joint_ui: dict[tuple[str, int], JointUiState] = {}
@@ -144,6 +145,11 @@ class ViserJointControlPanel:
             self._send_on_update_handle = self._server.gui.add_checkbox(
                 "Send on jog",
                 initial_value=self._cfg.command.send_on_update,
+            )
+            self._body_ctrl_mode_handle = self._server.gui.add_dropdown(
+                "Body control",
+                options=("joint", "cartesian"),
+                initial_value="joint",
             )
             self._mode_handle = self._server.gui.add_dropdown(
                 "Body mode",
@@ -205,6 +211,7 @@ class ViserJointControlPanel:
                 self._head_home_button = None
 
         self._send_on_update_handle.on_update(self._on_send_on_update_changed)
+        self._body_ctrl_mode_handle.on_update(self._on_body_ctrl_mode_changed)
         self._send_button.on_click(self._on_send_clicked)
         if self._ready_pose_button is not None:
             self._ready_pose_button.on_click(self._on_ready_pose_clicked)
@@ -426,7 +433,7 @@ class ViserJointControlPanel:
             self._syncing_gui = False
 
     def _send_if_enabled(self, components: set[str]) -> None:
-        if not self._stream_on:
+        if not self._stream_on or self._body_ctrl_mode != "joint":
             return
         try:
             self._send_current_targets(components)
@@ -511,30 +518,36 @@ class ViserJointControlPanel:
             f"Target RPY (deg): **rx={rpy[0]:.1f}  ry={rpy[1]:.1f}  rz={rpy[2]:.1f}**"
         )
 
-    def _send_cartesian_targets(self, arms: set[str]) -> None:
-        targets = {a: self._cartesian_targets[a].copy() for a in arms if a in self._cartesian_targets}
-        if not targets:
+    def _send_cartesian_targets(self) -> None:
+        """Send ALL enabled Cartesian arm targets + torso joint hold in one body command.
+
+        In Cartesian mode every arm must be sent as CartesianCommandBuilder
+        simultaneously.  Mixing Cartesian and joint builders for different arms
+        in successive stream commands causes Cartesian↔joint transitions on the
+        non-targeted arm, which destabilises it.  Sending all arms Cartesian
+        together avoids this entirely.
+
+        Torso is always joint (SDK requirement) and is included as a position
+        hold so it is not dropped from the stream.
+        """
+        cart_targets = {a: T.copy() for a, T in self._cartesian_targets.items()}
+        if not cart_targets:
             return
         cart_settings = self._current_cartesian_settings()
         joint_settings = self._current_settings()
-        # Hold all other enabled body components so they are not dropped from
-        # the stream when a Cartesian-only body command is sent.
-        joint_holds = {
-            c: self._target_by_component[c].copy()
-            for c in (set(self._group_specs) & self._BODY_COMPONENTS) - set(targets)
-        }
-        self._command_client.apply_cartesian_targets(targets, cart_settings, joint_holds, joint_settings)
-        logging.info(
-            "Streamed Cartesian target for %s (holds: %s)",
-            sorted(targets),
-            sorted(joint_holds),
+        torso_hold: dict[str, np.ndarray] = {}
+        if "torso" in self._group_specs:
+            torso_hold["torso"] = self._target_by_component["torso"].copy()
+        self._command_client.apply_cartesian_targets(
+            cart_targets, cart_settings, torso_hold, joint_settings
         )
+        logging.info("Streamed Cartesian targets for %s", sorted(cart_targets))
 
-    def _send_cartesian_if_enabled(self, arms: set[str]) -> None:
-        if not self._stream_on:
+    def _send_cartesian_if_enabled(self) -> None:
+        if not self._stream_on or self._body_ctrl_mode != "cartesian":
             return
         try:
-            self._send_cartesian_targets(arms)
+            self._send_cartesian_targets()
         except Exception:
             logging.exception("Failed to stream Cartesian command from viser panel")
 
