@@ -15,25 +15,19 @@ viser:
   title: "RB-Y1 Joint Control"
 
 command:
-  enable_torso: false
-  enable_right_arm: false
-  enable_left_arm: false
+  enable_torso: true
+  enable_right_arm: true
+  enable_left_arm: true
   enable_head: true
   send_on_update: true
   command_rate_hz: 10.0
-  body_mode: "impedance"
   body_minimum_time: 1.0
   head_minimum_time: 2.0
-  control_hold_time: 1000000.0
-  stiffness: 50.0
-  damping_ratio: 1.0
-  torque_limit: 30.0
   jog_step_small_deg: 1.0
   jog_step_large_deg: 5.0
   cartesian_linear_velocity_limit: 0.3
   cartesian_angular_velocity_limit: 3.14159
   cartesian_acceleration_limit_scaling: 0.8
-  cartesian_minimum_time: 1.0
   cartesian_position_step_m: 0.01
   cartesian_orientation_step_deg: 5.0
 

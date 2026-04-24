@@ -10,8 +10,9 @@ RB-Y1용 시각화, 좌표계 추적, calibration, control 앱을 한 곳에 모
 - RealSense + SAM3 realtime segmentation wrapper/app
 
 예정 단계:
+- viser head/torso를 움직이면 right arm이 움직이는 문제
 - head camera calibration 파이프라인
-- config 기반 control app 정리
+- 기본 grasping 기능 통합
 
 ## Documentation
 
@@ -123,12 +124,11 @@ Rerun viewer에서 확인할 수 있는 것:
 
 패널에는 아래 동작이 포함됩니다.
 - `Move to ready pose`: `22_joint_impedance_control.py`의 ready pose를 사용
-- `Send target pose`: 현재 target state를 stream으로 전송
-- `Head to zero`: head joint만 0도로 복귀
+- `Apply joint targets`: 현재 편집한 joint target을 한 번에 blocking 적용
 - component별 탭으로 UI를 나눠서 세로 길이를 줄였습니다.
 - 각 joint는 숫자 입력과 `-5/-1/+1/+5 deg` jog 버튼으로 조작합니다.
-- 기본값으로 `Send on jog=true`라서 jog 버튼을 누르면 바로 로봇에 반영됩니다.
-- jog/숫자 입력은 변경된 component만 전송하고, `Send target pose`는 활성화된 모든 component target을 전송합니다.
+- joint 숫자 입력은 로컬 target 편집용이고, joint jog/zero 버튼은 클릭 즉시 해당 component에 blocking 적용됩니다.
+- Cartesian은 `Send on jog=true`일 때 long-lived stream으로 바로 반영됩니다.
 
 ## Library Usage
 
@@ -165,23 +165,19 @@ run_visualize_robot(cfg)
 현재 `viser_joint_control_panel`은 입력 UI만 담당합니다.
 - `Rerun`은 관찰/시각화
 - `Viser`는 component tab + number input + jog button 기반 입력
-- torso/arm은 position 또는 joint impedance
-- head는 joint position command
+- joint target 적용은 session-level `Apply joint targets` 하나로 통합했습니다.
+- head는 별도 zero 버튼 없이 joint target 편집 후 같은 apply 경로를 사용합니다.
+- joint jog/zero 버튼은 `keyboard_control.py`처럼 바로 움직이고, 숫자 입력값은 필요할 때 `Apply joint targets`로 보냅니다.
 - ready pose는 `rby1-sdk/examples/python/22_joint_impedance_control.py`의 preset 하나를 그대로 사용합니다.
-- 기본 제어값은 SDK 예제 쪽 패턴에 맞췄습니다.
 - body는 `minimum_time=1.0`을 사용합니다.
-  jog 반응성 기준으로 조정했습니다. (preset move는 별도 `move_j`로 처리 예정)
+  joint target apply의 기본값입니다.
 - head는 `minimum_time=2.0`을 사용합니다.
   `34_head_joint_control.py`의 기본값 기준입니다.
-- `stiffness=50.0`, `damping_ratio=1.0`, `torque_limit=30.0`은
-  `17_teleoperation_with_joint_mapping.py`의 impedance 설정을 따릅니다.
-- `control_hold_time=1e6`은 `17_teleoperation_with_joint_mapping.py`의 stream command 기준입니다.
-- torso는 `17_teleoperation_with_joint_mapping.py` 흐름에 맞춰 항상 `JointPositionCommandBuilder`를 사용합니다.
-- arm streaming command에는 `17` 예제처럼 velocity / acceleration limit도 같이 넣습니다.
-- panel 전송은 `send_command`가 아니라 공용 `command_stream` 기반입니다.
-- `command_stream`이 만료되면 자동으로 다시 생성해서 재전송합니다.
-- jog/number 입력은 별도 worker thread를 거치지 않고 callback에서 바로 stream으로 전송합니다.
-- 시작 시 한 번 현재 자세를 target으로 읽어오고, 별도의 `Load current pose` 버튼은 두지 않습니다.
+- arm Cartesian stream은 packaged `rby1.yaml`의 Cartesian impedance 설정을 재사용합니다.
+- arm streaming command에는 velocity / acceleration limit을 같이 넣습니다.
+- panel은 `RBY1` wrapper + 공용 `RBY1Stream` 기반으로 동작합니다.
+- `RBY1Stream`이 만료되면 자동으로 다시 생성해서 재개합니다.
+- 시작 시 한 번 현재 자세를 target으로 읽어오고, 별도의 joint sync 버튼은 두지 않습니다.
 
 `viser`는 이 개발 환경에서 아직 설치 검증을 하지는 못했습니다. 패키지 의존성에는 추가해두었고, 실행 시 env에 `viser`가 있어야 합니다.
 
