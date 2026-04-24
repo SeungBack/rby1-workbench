@@ -28,4 +28,4 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.setuptools.package-data]
-rby1_workbench = ["conf/*.yaml"]
+rby1_workbench = ["conf/*.yaml", "conf/**/*.yaml"]

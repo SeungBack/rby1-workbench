@@ -130,3 +130,93 @@ def load_viser_joint_control_config(
 
 def package_root() -> Path:
     return Path(__file__).resolve().parents[3]
+
+
+# ---------------------------------------------------------------------------
+# RBY1 robot control config (새 wrapper용)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class CartesianImpedanceStreamConfig:
+    """CartesianImpedanceControlCommandBuilder 파라미터. VR teleop 기본값 사용."""
+    # 팔 (7-DOF)
+    arm_stiffness: list = field(default_factory=lambda: [80.0, 80.0, 80.0, 80.0, 80.0, 80.0, 40.0])
+    arm_torque_limit: list = field(default_factory=lambda: [30.0] * 7)
+    arm_linear_velocity_limit: float = 2.0
+    arm_angular_velocity_limit: float = 6.2831853  # 2*pi
+    arm_linear_accel_limit: float = 20.0
+    arm_angular_accel_limit: float = 251.327412   # 80*pi
+    # 토르소 (6-DOF)
+    torso_stiffness: list = field(default_factory=lambda: [400.0] * 6)
+    torso_torque_limit: list = field(default_factory=lambda: [500.0] * 6)
+    torso_linear_velocity_limit: float = 1.0
+    torso_angular_velocity_limit: float = 1.5707963  # pi/2
+    torso_linear_accel_limit: float = 10.0
+    torso_angular_accel_limit: float = 62.8318530   # 20*pi
+    # 관절 리밋 (joint name → [lower, upper])
+    joint_limits: dict = field(default_factory=lambda: {
+        "right_arm_3": [-2.6, -0.5],
+        "right_arm_5": [0.2, 1.9],
+        "left_arm_3": [-2.6, -0.5],
+        "left_arm_5": [0.2, 1.9],
+        "torso_1": [-0.523598776, 1.3],
+        "torso_2": [-2.617993878, -0.2],
+    })
+
+
+@dataclass
+class StreamConfig:
+    """create_stream() 동작 설정."""
+    dt: float = 0.1  # 제어 주기 [s]; control_hold_time = dt*10, minimum_time = dt*1.01
+    torso_mode: str = "joint_position"        # "joint_position" | "cartesian_impedance"
+    right_arm_mode: str = "cartesian_impedance"
+    left_arm_mode: str = "cartesian_impedance"
+
+
+@dataclass
+class GripperConfig:
+    enabled: bool = False
+    tool_flange_voltage: int = 12
+    tcp_host: str = "0.0.0.0"   # TCPGripperServer bind 주소
+    tcp_port: int = 5000
+
+
+@dataclass
+class RBY1Config:
+    """RBY1 로봇 전체 설정."""
+    address: str = "192.168.30.1:50051"
+    model: str = "a"
+    power_pattern: str = ".*"
+    servo_pattern: str = ".*"
+    unlimited_mode: bool = True
+    state_update_hz: float = 100.0
+    stream: StreamConfig = field(default_factory=StreamConfig)
+    cartesian_impedance: CartesianImpedanceStreamConfig = field(
+        default_factory=CartesianImpedanceStreamConfig
+    )
+    gripper: GripperConfig = field(default_factory=GripperConfig)
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "RBY1Config":
+        d = dict(d)
+        stream = StreamConfig(**d.pop("stream", {}))
+        ci_raw = d.pop("cartesian_impedance", {})
+        ci = CartesianImpedanceStreamConfig(**ci_raw)
+        gripper = GripperConfig(**d.pop("gripper", {}))
+        return cls(stream=stream, cartesian_impedance=ci, gripper=gripper, **d)
+
+    @classmethod
+    def from_yaml(cls, path: str) -> "RBY1Config":
+        import yaml
+        with open(path) as f:
+            data = yaml.safe_load(f)
+        return cls.from_dict(data or {})
+
+    @classmethod
+    def from_hydra(cls, cfg: Any) -> "RBY1Config":
+        """Hydra DictConfig → RBY1Config 변환."""
+        if isinstance(cfg, DictConfig):
+            data = OmegaConf.to_container(cfg, resolve=True)
+        else:
+            data = dict(cfg)
+        return cls.from_dict(data)
