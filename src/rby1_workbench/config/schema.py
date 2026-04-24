@@ -220,3 +220,15 @@ class RBY1Config:
         else:
             data = dict(cfg)
         return cls.from_dict(data)
+
+    def __repr__(self) -> str:
+        return (
+            f"RBY1Config(address={self.address!r}, model={self.model!r}, "
+            f"unlimited_mode={self.unlimited_mode}, "
+            f"stream=StreamConfig(dt={self.stream.dt}, "
+            f"torso={self.stream.torso_mode!r}, "
+            f"right_arm={self.stream.right_arm_mode!r}, "
+            f"left_arm={self.stream.left_arm_mode!r}), "
+            f"gripper=GripperConfig(enabled={self.gripper.enabled}, "
+            f"tcp={self.gripper.tcp_host}:{self.gripper.tcp_port}))"
+        )

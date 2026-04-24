@@ -8,6 +8,7 @@ None인 컴포넌트는 마지막으로 보낸 값으로 자동 hold.
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Any
 
 import numpy as np
@@ -25,17 +26,21 @@ class RBY1Stream:
 
         stream = robot.create_stream()
 
-        # 첫 tick: 초기 포즈 전부 지정
+        # 첫 send는 reset=True 자동 적용 (CartesianImpedance 시작 시 튐 방지)
         stream.send(
             torso=q_torso,
-            right_arm=T_right,   # 4×4 SE3 (cartesian_impedance 모드)
+            right_arm=T_right,
             left_arm=T_left,
-            head=(yaw, pitch),
-            reset=True,          # CartesianImpedance reset_reference
+            head=np.array([yaw, pitch]),
         )
 
         # 이후: 바뀐 것만 — 나머지는 마지막 값으로 자동 hold
         stream.send(right_arm=T_right_new)
+
+        # blocking command 전후 일시정지 / 재개
+        stream.pause()
+        robot.movej(...)          # SDK 스트림과 충돌 없이 실행됨
+        stream.resume()           # 다음 send부터 reset=True 자동 재적용
 
         stream.cancel()
 
@@ -49,7 +54,10 @@ class RBY1Stream:
         self._robot = sdk_robot
         self._cfg = cfg
         self._stream = sdk_robot.create_command_stream()
-        self._last: dict[str, Any] = {}   # component → 마지막 전송값
+        self._last: dict[str, Any] = {}
+        self._paused = False
+        self._first_send = True   # True → 다음 send에서 reset=True 자동 적용
+        self._lock = threading.Lock()
 
     # ------------------------------------------------------------------
     # Public API
@@ -60,40 +68,72 @@ class RBY1Stream:
         torso: np.ndarray | None = None,
         right_arm: np.ndarray | None = None,
         left_arm: np.ndarray | None = None,
-        head: tuple[float, float] | None = None,
-        reset: bool = False,
+        head: np.ndarray | tuple[float, float] | None = None,
+        reset: bool | None = None,
     ) -> None:
         """전체 컴포넌트를 하나의 command로 묶어 스트림 전송.
 
         Args:
-            torso: 관절 위치 배열 (torso_mode=joint_position) 또는 4×4 SE3 (cartesian_impedance).
-            right_arm: 4×4 SE3 행렬 (cartesian_impedance) 또는 관절 위치 배열.
+            torso: 관절 위치 배열 또는 4×4 SE3 (torso_mode 설정에 따라).
+            right_arm: 4×4 SE3 또는 관절 위치 배열.
             left_arm: 동상.
-            head: (yaw_rad, pitch_rad) 튜플.
-            reset: CartesianImpedanceControlCommandBuilder.set_reset_reference() 플래그.
-                   팔이 새로 tracking 시작할 때 True로 설정하면 시작 시 튐 방지.
+            head: [yaw_rad, pitch_rad] — ndarray 또는 (yaw, pitch) 튜플.
+            reset: CartesianImpedance reset_reference 플래그.
+                   None(기본)이면 스트림 시작/재개 후 첫 번째 send에서만 True 자동 적용.
         """
-        # None이면 last로 채움
-        torso     = torso     if torso     is not None else self._last.get("torso")
-        right_arm = right_arm if right_arm is not None else self._last.get("right_arm")
-        left_arm  = left_arm  if left_arm  is not None else self._last.get("left_arm")
-        head      = head      if head      is not None else self._last.get("head")
+        with self._lock:
+            if self._paused:
+                return
 
-        cmd = self._build(torso, right_arm, left_arm, head, reset)
-        if cmd is None:
-            return
+            _reset = self._first_send if reset is None else reset
 
-        self._stream.send_command(cmd)
+            # None이면 last로 채움
+            torso     = torso     if torso     is not None else self._last.get("torso")
+            right_arm = right_arm if right_arm is not None else self._last.get("right_arm")
+            left_arm  = left_arm  if left_arm  is not None else self._last.get("left_arm")
+            head      = head      if head      is not None else self._last.get("head")
 
-        # last 업데이트
-        if torso is not None:
-            self._last["torso"] = torso
-        if right_arm is not None:
-            self._last["right_arm"] = right_arm
-        if left_arm is not None:
-            self._last["left_arm"] = left_arm
-        if head is not None:
-            self._last["head"] = head
+            cmd = self._build(torso, right_arm, left_arm, head, _reset)
+            if cmd is None:
+                return
+
+            self._stream.send_command(cmd)
+            self._first_send = False
+
+            # last 업데이트
+            if torso is not None:
+                self._last["torso"] = torso
+            if right_arm is not None:
+                self._last["right_arm"] = right_arm
+            if left_arm is not None:
+                self._last["left_arm"] = left_arm
+            if head is not None:
+                self._last["head"] = head
+
+    def pause(self) -> None:
+        """스트림 전송 일시정지.
+
+        진행 중인 send()가 완료될 때까지 대기한 후 중단.
+        이미 paused 상태라면 no-op.
+        """
+        with self._lock:
+            self._paused = True
+
+    def resume(self) -> None:
+        """스트림 전송 재개.
+
+        다음 send()부터 실제로 전송되며, reset=True가 자동 적용됨.
+        이를 통해 blocking command 후 포즈가 달라진 상태에서도
+        CartesianImpedance가 튀지 않고 부드럽게 재개됨.
+        """
+        with self._lock:
+            self._paused = False
+            self._first_send = True   # 재개 후 첫 send에서 reset_reference
+
+    @property
+    def paused(self) -> bool:
+        """현재 일시정지 상태 여부."""
+        return self._paused
 
     def cancel(self) -> None:
         """스트림 취소."""
@@ -138,10 +178,11 @@ class RBY1Stream:
 
         # ---- head (항상 JointPosition) ----
         if has_head:
+            h = np.asarray(head, dtype=float)
             cbc.set_head_command(
                 rby.JointPositionCommandBuilder()
                 .set_command_header(rby.CommandHeaderBuilder().set_control_hold_time(hold_time))
-                .set_position([float(head[0]), float(head[1])])
+                .set_position([float(h[0]), float(h[1])])
                 .set_minimum_time(min_time)
             )
 
@@ -151,13 +192,11 @@ class RBY1Stream:
         # ---- body ----
         body = rby.BodyComponentBasedCommandBuilder()
 
-        # torso
         if torso is not None:
             body.set_torso_command(
                 self._build_torso(torso, hold_time, min_time, reset)
             )
 
-        # arms
         for component, T_or_q in (("right_arm", right_arm), ("left_arm", left_arm)):
             if T_or_q is None:
                 continue
