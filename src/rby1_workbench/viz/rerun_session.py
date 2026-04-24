@@ -9,7 +9,7 @@ import numpy as np
 import rerun as rr
 import rerun.blueprint as rrb
 
-from rby1_workbench.config.schema import VizConfig
+from omegaconf import DictConfig
 from rby1_workbench.geometry.transform_graph import TransformGraph
 
 
@@ -19,7 +19,7 @@ FRAME_COLORS = [[220, 60, 60], [60, 220, 60], [60, 60, 220]]
 class RerunSession:
     """Manage a simple 3D Rerun scene for robot frames."""
 
-    def __init__(self, cfg: VizConfig):
+    def __init__(self, cfg: DictConfig):
         self.cfg = cfg
         self._static_mesh_entities: set[str] = set()
 

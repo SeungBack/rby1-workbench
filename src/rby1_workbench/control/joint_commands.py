@@ -10,7 +10,7 @@ from typing import Any
 import numpy as np
 import rby1_sdk as rby
 
-from rby1_workbench.config.schema import JointControlConfig
+from omegaconf import DictConfig
 from rby1_workbench.robot.joints import component_joint_names
 
 
@@ -37,7 +37,7 @@ class JointCommandSettings:
     torque_limit: float = 30.0
 
     @classmethod
-    def from_control_config(cls, cfg: JointControlConfig) -> "JointCommandSettings":
+    def from_control_config(cls, cfg: DictConfig) -> "JointCommandSettings":
         return cls(
             body_mode=cfg.body_mode,
             body_minimum_time=cfg.body_minimum_time,

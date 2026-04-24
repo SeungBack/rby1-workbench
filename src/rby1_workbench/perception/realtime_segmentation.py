@@ -6,7 +6,7 @@ from collections import deque
 import logging
 import time
 
-from rby1_workbench.config.schema import RealtimeSam3AppConfig
+from omegaconf import DictConfig
 from rby1_workbench.perception.realsense import RealSenseStream
 from rby1_workbench.perception.sam3 import Sam3RealtimePredictor
 from rby1_workbench.perception.visualizer import OpenCVPromptVisualizer
@@ -15,7 +15,7 @@ from rby1_workbench.perception.visualizer import OpenCVPromptVisualizer
 LOGGER = logging.getLogger(__name__)
 
 
-def run_realtime_sam3_realsense(cfg: RealtimeSam3AppConfig) -> None:
+def run_realtime_sam3_realsense(cfg: DictConfig) -> None:
     """Launch the realtime RealSense + SAM3 prompt-and-segment loop."""
     stream = RealSenseStream(cfg.realsense)
     predictor = Sam3RealtimePredictor(cfg.sam3)
@@ -81,7 +81,7 @@ def _estimate_fps(frame_times: deque[float]) -> float:
     return (len(frame_times) - 1) / elapsed
 
 
-def _print_usage_banner(cfg: RealtimeSam3AppConfig) -> None:
+def _print_usage_banner(cfg: DictConfig) -> None:
     amp_status = "ON" if cfg.sam3.enable_autocast and cfg.sam3.device != "cpu" else "OFF/CPU"
     print(
         "\n"

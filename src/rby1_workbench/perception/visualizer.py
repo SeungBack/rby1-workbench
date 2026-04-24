@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from rby1_workbench.config.schema import OpenCVVisualizerConfig
+from omegaconf import DictConfig
 from rby1_workbench.perception.realsense import RealSenseFrame
 from rby1_workbench.perception.sam3 import (
     PromptBox,
@@ -38,7 +38,7 @@ class OpenCVPromptVisualizer:
 
     def __init__(
         self,
-        config: OpenCVVisualizerConfig,
+        config: DictConfig,
         initial_text_prompt: str = "",
     ):
         self.config = config
@@ -59,6 +59,7 @@ class OpenCVPromptVisualizer:
 
         self._cv2.namedWindow(self.config.window_name, self._cv2.WINDOW_NORMAL)
         self._cv2.setMouseCallback(self.config.window_name, self._on_mouse)
+        self._text_line_type = self._cv2.LINE_8
 
     @staticmethod
     def _import_cv2():
@@ -169,15 +170,21 @@ class OpenCVPromptVisualizer:
         canvas: np.ndarray,
         predictions: list[Sam3Prediction],
     ) -> np.ndarray:
-        overlay = canvas.astype(np.float32).copy()
+        overlay = canvas.copy()
         alpha = float(np.clip(self.config.mask_alpha, 0.0, 1.0))
+        has_mask = False
 
         for prediction in predictions:
-            color = np.asarray(self._instance_color(prediction.instance_index), dtype=np.float32)
+            color = np.asarray(self._instance_color(prediction.instance_index), dtype=np.uint8)
             for mask in prediction.masks:
-                overlay[mask] = overlay[mask] * (1.0 - alpha) + color * alpha
+                overlay[mask] = color
+                has_mask = True
 
-        result = overlay.clip(0, 255).astype(np.uint8)
+        result = (
+            self._cv2.addWeighted(overlay, alpha, canvas, 1.0 - alpha, 0)
+            if has_mask
+            else canvas
+        )
         for prediction in predictions:
             color = self._instance_color(prediction.instance_index)
             for box, score in zip(prediction.boxes_xyxy, prediction.scores):
@@ -190,8 +197,8 @@ class OpenCVPromptVisualizer:
                     self._cv2.FONT_HERSHEY_SIMPLEX,
                     self.config.font_scale,
                     color,
-                    2,
-                    self._cv2.LINE_AA,
+                    1,
+                    self._text_line_type,
                 )
         return result
 
@@ -225,7 +232,7 @@ class OpenCVPromptVisualizer:
                     self.config.font_scale,
                     color,
                     1,
-                    self._cv2.LINE_AA,
+                    self._text_line_type,
                 )
 
         if self._preview_box is not None:
@@ -253,7 +260,7 @@ class OpenCVPromptVisualizer:
             self.config.font_scale,
             (255, 255, 255),
             1,
-            self._cv2.LINE_AA,
+            self._text_line_type,
         )
         return depth_vis
 
@@ -316,15 +323,13 @@ class OpenCVPromptVisualizer:
         left = 12
         panel_height = max(36, self.config.line_height * len(lines) + 10)
         panel_width = max(640, min(canvas.shape[1] - 24, int(canvas.shape[1] * 0.6)))
-        overlay = canvas.copy()
         self._cv2.rectangle(
-            overlay,
+            canvas,
             (left - 8, top - 18),
             (left + panel_width, top - 18 + panel_height),
             (0, 0, 0),
             -1,
         )
-        canvas[:] = self._cv2.addWeighted(overlay, 0.45, canvas, 0.55, 0)
 
         for index, line in enumerate(lines):
             y = top + index * self.config.line_height
@@ -336,7 +341,7 @@ class OpenCVPromptVisualizer:
                 self.config.font_scale,
                 (255, 255, 255),
                 1,
-                self._cv2.LINE_AA,
+                self._text_line_type,
             )
 
     def _handle_text_edit_key(self, key: int) -> bool:

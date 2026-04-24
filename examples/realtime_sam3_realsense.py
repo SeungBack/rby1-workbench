@@ -5,35 +5,16 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from rby1_workbench import (
-    OpenCVVisualizerConfig,
-    RealSenseConfig,
-    RealtimeSam3AppConfig,
-    Sam3Config,
-    run_realtime_sam3_realsense,
-)
+from rby1_workbench.config import load_sam3_config
+from rby1_workbench.perception.realtime_segmentation import run_realtime_sam3_realsense
 
 
 def main() -> None:
-    cfg = RealtimeSam3AppConfig(
-        realsense=RealSenseConfig(
-            color_width=640,
-            color_height=480,
-            depth_width=640,
-            depth_height=480,
-            fps=30,
-        ),
-        sam3=Sam3Config(
-            checkpoint_path=None,
-            device="auto",
-            confidence_threshold=0.5,
-        ),
-        visualizer=OpenCVVisualizerConfig(
-            window_name="RealSense SAM3 Example",
-            show_depth=True,
-        ),
-        initial_text_prompt="bottle",
-    )
+    cfg = load_sam3_config()
+    cfg.sam3.checkpoint_path = None  # set your model path here
+    cfg.visualizer.window_name = "RealSense SAM3 Example"
+    cfg.visualizer.show_depth = True
+    cfg.initial_text_prompt = "bottle"
     run_realtime_sam3_realsense(cfg)
 
 

@@ -8,14 +8,14 @@ import time
 
 import rerun as rr
 
-from rby1_workbench.config.schema import VisualizeRobotConfig
+from omegaconf import DictConfig
 from rby1_workbench.robot.client import RobotStateBuffer, connect_robot
 from rby1_workbench.robot.kinematics import RobotKinematics
 from rby1_workbench.viz.mesh_assets import default_link_mesh_map, discover_default_mesh_dir
 from rby1_workbench.viz.rerun_session import RerunSession
 
 
-def run_visualize_robot(cfg: VisualizeRobotConfig) -> None:
+def run_visualize_robot(cfg: DictConfig) -> None:
     """Run the live robot frame viewer until interrupted."""
     logging.info("Connecting to RB-Y1 at %s", cfg.robot.address)
     robot = connect_robot(cfg.robot)

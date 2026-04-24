@@ -8,6 +8,7 @@ Last updated: 2026-04-24
 
 - 로컬 pip-installable library 형태 정리
 - import 이름을 `rby1_workbench`로 명확화
+- OmegaConf `DictConfig` + YAML 기반 설정 계층 정리
 - live robot state 수집
 - RB-Y1 link chain 기반 FK 계산
 - frame graph 구성
@@ -21,23 +22,23 @@ Last updated: 2026-04-24
 
 - `pyproject.toml` 기반 패키지 구성
 - `src/rby1_workbench/` 패키지 구조 분리
-- Hydra config 진입점 추가
+- packaged YAML + OmegaConf loader 구성
+- Hydra app entry point 유지
 - console script entry point 추가
 - public import API 추가
 
 ### Config
 
 - `rby1_workbench.config.schema`
-  - `RobotConfig`
-  - `VizConfig`
-  - `VisualizeRobotConfig`
-  - `ViserConfig`
-  - `JointControlConfig`
-  - `ViserJointControlAppConfig`
-  - `RealSenseConfig`
-  - `Sam3Config`
-  - `OpenCVVisualizerConfig`
-  - `RealtimeSam3AppConfig`
+  - `load_rby1_config()`
+  - `load_sam3_config()`
+  - `package_root()`
+- packaged config YAML
+  - `conf/rby1.yaml`
+  - `conf/visualize_robot.yaml`
+  - `conf/viser_joint_control_panel.yaml`
+  - `conf/realtime_sam3_realsense.yaml`
+- custom config dataclass 제거 완료
 
 ### Geometry
 
@@ -152,9 +153,8 @@ Last updated: 2026-04-24
 
 ### Examples
 
-- `examples/library_visualize_robot.py`
-- `examples/kinematics_snapshot.py`
-- `examples/library_viser_joint_control.py`
+- `examples/robot_control_basic.py`
+- `examples/keyboard_control.py`
 - `examples/realtime_sam3_realsense.py`
 
 ## Not Implemented Yet
@@ -170,6 +170,7 @@ Last updated: 2026-04-24
 
 - 목표는 현재 `online package publish`가 아니라 `local package install`입니다.
 - Python import 이름은 `rby1_workbench`입니다.
+- public config API는 dataclass가 아니라 `DictConfig` loader입니다.
 - `visualize_robot`는 현재 기본적으로 읽기 전용입니다.
 - power / servo / control manager enable은 명시적으로 config를 바꿨을 때만 수행됩니다.
 - `realtime_sam3_realsense`는 prompt 입력과 시각화를 OpenCV 창 안에 모아두고, 추론 로직은 wrapper로 분리합니다.

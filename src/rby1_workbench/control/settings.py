@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from rby1_workbench.config.schema import JointControlConfig
+from omegaconf import DictConfig
 
 
 @dataclass(slots=True)
@@ -18,7 +18,7 @@ class JointCommandSettings:
     torque_limit: float = 30.0
 
     @classmethod
-    def from_control_config(cls, cfg: JointControlConfig) -> "JointCommandSettings":
+    def from_control_config(cls, cfg: DictConfig) -> "JointCommandSettings":
         return cls(
             body_mode=cfg.body_mode,
             body_minimum_time=cfg.body_minimum_time,

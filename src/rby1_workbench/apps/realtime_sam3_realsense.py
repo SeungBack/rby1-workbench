@@ -7,7 +7,6 @@ import logging
 import hydra
 from omegaconf import DictConfig
 
-from rby1_workbench.config.schema import load_realtime_sam3_config
 from rby1_workbench.perception.realtime_segmentation import run_realtime_sam3_realsense
 
 
@@ -22,8 +21,7 @@ logging.basicConfig(
     version_base=None,
 )
 def cli(cfg: DictConfig) -> None:
-    app_cfg = load_realtime_sam3_config(cfg)
-    run_realtime_sam3_realsense(app_cfg)
+    run_realtime_sam3_realsense(cfg)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # RBY1 로봇 기본 설정
-# RBY1Config dataclass와 1:1 대응
-# robot = RBY1(RBY1Config.from_yaml("path/to/rby1.yaml"))
+# load_rby1_config()가 기본으로 읽는 packaged YAML
+# cfg = load_rby1_config("path/to/custom_rby1.yaml") 로 사용자 YAML merge 가능
 
 address: "192.168.12.1:50051"
 model: "m"

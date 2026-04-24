@@ -22,7 +22,7 @@ import warnings
 import numpy as np
 from PIL import Image
 
-from rby1_workbench.config.schema import Sam3Config
+from omegaconf import DictConfig
 
 
 LOGGER = logging.getLogger(__name__)
@@ -92,7 +92,7 @@ class Sam3Prediction:
 class Sam3RealtimePredictor:
     """Wrap SAM3 grounding and interactive segmentation for live images."""
 
-    def __init__(self, config: Sam3Config):
+    def __init__(self, config: DictConfig):
         self.config = config
         self._torch = self._import_torch()
         build_sam3_image_model, Sam3Processor = self._import_sam3()
@@ -167,6 +167,7 @@ class Sam3RealtimePredictor:
         if self.device != "cuda":
             return
         device_props = self._torch.cuda.get_device_properties(0)
+        self._torch.backends.cudnn.benchmark = True
         if device_props.major >= 8:
             self._torch.backends.cuda.matmul.allow_tf32 = True
             self._torch.backends.cudnn.allow_tf32 = True
@@ -204,6 +205,9 @@ class Sam3RealtimePredictor:
         dtype = self._torch.bfloat16 if dtype_name == "bfloat16" else self._torch.float16
         return self._torch.autocast(device_type="cuda", dtype=dtype)
 
+    def _inference_context(self):
+        return self._torch.inference_mode()
+
     def predict(
         self,
         image_rgb: np.ndarray,
@@ -240,7 +244,7 @@ class Sam3RealtimePredictor:
 
     def _prepare_state(self, image_rgb: np.ndarray) -> dict:
         pil_image = Image.fromarray(image_rgb)
-        with self._autocast_context():
+        with self._inference_context(), self._autocast_context():
             return self.processor.set_image(pil_image, state={})
 
     def prepare_frame_state(self, image_rgb: np.ndarray) -> dict:
@@ -270,7 +274,7 @@ class Sam3RealtimePredictor:
         return np.asarray(value)
 
     def _predict_text(self, state: dict, text_prompt: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        with self._autocast_context():
+        with self._inference_context(), self._autocast_context():
             output = self.processor.set_text_prompt(prompt=text_prompt, state=state)
 
         masks = self._to_numpy(output["masks"].squeeze(1)).astype(bool)
@@ -300,7 +304,7 @@ class Sam3RealtimePredictor:
         if prompt_state.box is not None:
             box = prompt_state.box.as_xyxy()
 
-        with self._autocast_context():
+        with self._inference_context(), self._autocast_context():
             masks, scores, _ = self.model.predict_inst(
                 state,
                 point_coords=point_coords,

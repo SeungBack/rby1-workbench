@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from rby1_workbench.config.schema import RealSenseConfig
+from omegaconf import DictConfig
 
 
 @dataclass(slots=True)
@@ -23,7 +23,7 @@ class RealSenseFrame:
 class RealSenseStream:
     """Thin wrapper around pyrealsense2 pipeline setup and frame retrieval."""
 
-    def __init__(self, config: RealSenseConfig):
+    def __init__(self, config: DictConfig):
         self.config = config
         self._rs = self._import_rs()
         self._pipeline = None

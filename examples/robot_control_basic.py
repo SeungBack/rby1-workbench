@@ -5,7 +5,7 @@
 실행:
     python examples/robot_control_basic.py
     python examples/robot_control_basic.py --address 192.168.30.1:50051 --model a
-    python examples/robot_control_basic.py --config conf/rby1.yaml
+    python examples/robot_control_basic.py --config /path/to/custom_rby1.yaml
     python examples/robot_control_basic.py --skip-streaming   # streaming 단계 건너뜀
 """
 

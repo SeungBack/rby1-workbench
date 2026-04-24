@@ -10,7 +10,8 @@ from typing import Any
 import numpy as np
 import rerun as rr
 
-from rby1_workbench.config.schema import ControlVizConfig, VizConfig
+from omegaconf import DictConfig, OmegaConf
+
 from rby1_workbench.robot.kinematics import RobotKinematics
 from rby1_workbench.viz.rerun_session import RerunSession
 
@@ -39,24 +40,23 @@ class ControlRerunViz:
     after each jog step to keep the target frame up-to-date in the viewer.
     """
 
-    def __init__(self, cfg: ControlVizConfig, robot: Any) -> None:
+    def __init__(self, cfg: DictConfig, robot: Any) -> None:
         self._cfg = cfg
         self._robot = robot
         # Own kinematics instance — only accessed from the background thread.
         self._kinematics = RobotKinematics(robot)
 
-        # Build a VizConfig compatible with RerunSession from our slimmer config.
-        viz_cfg = VizConfig(
-            application_id=cfg.application_id,
-            spawn_viewer=cfg.spawn_viewer,
-            world_frame=cfg.world_frame,
-            arrow_length_m=cfg.arrow_length_m,
-            log_robot_frames=True,
-            log_head_frames=True,
-            log_joint_scalars=False,
-            log_skeletons=cfg.log_skeletons,
-            log_meshes=False,
-        )
+        viz_cfg = OmegaConf.create({
+            "application_id": cfg.application_id,
+            "spawn_viewer": cfg.spawn_viewer,
+            "world_frame": cfg.world_frame,
+            "arrow_length_m": cfg.arrow_length_m,
+            "log_robot_frames": True,
+            "log_head_frames": True,
+            "log_joint_scalars": False,
+            "log_skeletons": cfg.log_skeletons,
+            "log_meshes": False,
+        })
         self._session = RerunSession(viz_cfg)
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None

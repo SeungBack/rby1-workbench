@@ -12,10 +12,10 @@ realsense:
 sam3:
   checkpoint_path: null
   device: "auto"
-  resolution: 1008
+  resolution: 320
   confidence_threshold: 0.5
   interactive_multimask_output: false
-  enable_compile: false
+  enable_compile: true
   enable_autocast: true
   autocast_dtype: "bfloat16"
 
@@ -24,9 +24,9 @@ visualizer:
   mask_alpha: 0.45
   point_radius: 6
   box_thickness: 2
-  show_help: true
-  show_depth: true
-  depth_hconcat: true
+  show_help: false
+  show_depth: false
+  depth_hconcat: false
   depth_preview_size: 180
   font_scale: 0.5
   line_height: 18

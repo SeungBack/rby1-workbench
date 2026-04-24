@@ -11,7 +11,7 @@ from typing import Any
 import numpy as np
 import rby1_sdk as rby
 
-from rby1_workbench.config.schema import RobotConfig
+from typing import Any
 
 
 @dataclass(slots=True)
@@ -20,7 +20,7 @@ class StateSnapshot:
     position: np.ndarray
 
 
-def connect_robot(cfg: RobotConfig) -> Any:
+def connect_robot(cfg: Any) -> Any:
     """Connect to the robot, optionally performing power/servo/control setup."""
     robot = rby.create_robot(cfg.address, cfg.model)
     if not robot.connect():

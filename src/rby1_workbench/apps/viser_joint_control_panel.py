@@ -7,7 +7,6 @@ import logging
 import hydra
 from omegaconf import DictConfig
 
-from rby1_workbench.config.schema import load_viser_joint_control_config
 from rby1_workbench.control.viser_joint_control import run_viser_joint_control_panel
 
 
@@ -22,8 +21,7 @@ logging.basicConfig(
     version_base=None,
 )
 def cli(cfg: DictConfig) -> None:
-    app_cfg = load_viser_joint_control_config(cfg)
-    run_viser_joint_control_panel(app_cfg)
+    run_viser_joint_control_panel(cfg)
 
 
 if __name__ == "__main__":

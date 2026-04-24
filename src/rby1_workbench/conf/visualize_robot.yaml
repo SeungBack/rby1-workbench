@@ -18,5 +18,6 @@ viz:
   log_head_frames: true
   log_joint_scalars: true
   log_skeletons: true
-  log_meshes: false
+  log_meshes: true
+  state_update_hz: 10.0
   mesh_dir: null

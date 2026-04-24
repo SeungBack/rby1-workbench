@@ -1,26 +1,11 @@
 """Public library API for rby1-workbench."""
 
 # Config
-from rby1_workbench.config.schema import (
-    # 새 wrapper용
-    load_rby1_config,
-    # 기존 viz 앱용 (유지)
-    OpenCVVisualizerConfig,
-    RealSenseConfig,
-    RealtimeSam3AppConfig,
-    Sam3Config,
-    JointControlConfig,
-    RobotConfig,
-    ViserConfig,
-    ViserJointControlAppConfig,
-    VisualizeRobotConfig,
-    VizConfig,
-)
+from rby1_workbench.config.schema import load_rby1_config, load_sam3_config
 
-# 새 robot wrapper
+# Robot wrapper
 from rby1_workbench.robot.rby1 import RBY1
 from rby1_workbench.robot.stream import RBY1Stream
-
 from rby1_workbench.robot.head import HeadController
 from rby1_workbench.robot.gripper import (
     GripperController,
@@ -29,7 +14,7 @@ from rby1_workbench.robot.gripper import (
     TCPGripperServer,
 )
 
-# 기존 viz 시스템 (유지)
+# Viz / geometry
 from rby1_workbench.geometry.transform_graph import TransformEdge, TransformGraph
 from rby1_workbench.robot.client import RobotStateBuffer, StateSnapshot, connect_robot
 from rby1_workbench.robot.kinematics import KinematicResult, RobotKinematics
@@ -55,46 +40,42 @@ from rby1_workbench.viz.rerun_session import RerunSession
 __version__ = "0.1.0"
 
 __all__ = [
-    # 새 wrapper
+    # Config
+    "load_rby1_config",
+    "load_sam3_config",
+    # Robot wrapper
     "RBY1",
     "RBY1Stream",
-    "load_rby1_config",
-    "OpenCVPromptVisualizer",
-    "OpenCVVisualizerConfig",
-    "PromptBox",
-    "PromptPoint",
-    "RealSenseConfig",
-    "RealSenseFrame",
-    "RealSenseStream",
-    "RealtimeSam3AppConfig",
-    "Sam3Config",
-    "Sam3Prediction",
-    "Sam3PromptState",
-    "Sam3RealtimePredictor",
     "GripperController",
     "GripperTCPClient",
     "HeadController",
     "InspireGripperController",
     "TCPGripperServer",
-    # 기존
-    "JointCommandClient",
-    "JointCommandSettings",
-    "JointControlConfig",
-    "JointGroupSpec",
+    # Geometry / kinematics
     "KinematicResult",
-    "RobotConfig",
     "RobotKinematics",
-    "RobotStateBuffer",
-    "RerunSession",
-    "StateSnapshot",
     "TransformEdge",
     "TransformGraph",
-    "ViserConfig",
-    "ViserJointControlAppConfig",
-    "VisualizeRobotConfig",
-    "VizConfig",
-    "connect_robot",
+    # Control
+    "JointCommandClient",
+    "JointCommandSettings",
+    "JointGroupSpec",
     "ready_pose_targets_for_model",
+    # Robot state
+    "RobotStateBuffer",
+    "StateSnapshot",
+    "connect_robot",
+    # Perception
+    "OpenCVPromptVisualizer",
+    "PromptBox",
+    "PromptPoint",
+    "RealSenseFrame",
+    "RealSenseStream",
+    "Sam3Prediction",
+    "Sam3PromptState",
+    "Sam3RealtimePredictor",
     "run_realtime_sam3_realsense",
+    # Viz
+    "RerunSession",
     "run_visualize_robot",
 ]

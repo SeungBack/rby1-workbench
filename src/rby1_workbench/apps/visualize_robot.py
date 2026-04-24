@@ -7,7 +7,6 @@ import logging
 import hydra
 from omegaconf import DictConfig
 
-from rby1_workbench.config.schema import load_visualize_robot_config
 from rby1_workbench.viz.live_robot_viewer import run_visualize_robot
 
 
@@ -18,8 +17,7 @@ logging.basicConfig(
 
 @hydra.main(config_path="../conf", config_name="visualize_robot", version_base=None)
 def cli(cfg: DictConfig) -> None:
-    app_cfg = load_visualize_robot_config(cfg)
-    run_visualize_robot(app_cfg)
+    run_visualize_robot(cfg)
 
 
 if __name__ == "__main__":

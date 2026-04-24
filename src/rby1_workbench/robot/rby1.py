@@ -54,7 +54,7 @@ class RBY1:
 
     사용 예::
 
-        cfg = load_rby1_config("config/rby1.yaml")
+        cfg = load_rby1_config()
         robot = RBY1(cfg)
         robot.initialize()                         # connect + power + servo + cm
 

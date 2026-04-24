@@ -1,15 +1,5 @@
-"""Configuration models for rby1-workbench."""
+"""Configuration loaders for rby1-workbench."""
 
-from rby1_workbench.config.schema import (
-    RobotConfig,
-    VisualizeRobotConfig,
-    VizConfig,
-    load_visualize_robot_config,
-)
+from rby1_workbench.config.schema import load_rby1_config, load_sam3_config, package_root
 
-__all__ = [
-    "RobotConfig",
-    "VisualizeRobotConfig",
-    "VizConfig",
-    "load_visualize_robot_config",
-]
+__all__ = ["load_rby1_config", "load_sam3_config", "package_root"]

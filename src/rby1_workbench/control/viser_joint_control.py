@@ -11,7 +11,7 @@ from typing import Any
 
 import numpy as np
 
-from rby1_workbench.config.schema import ViserJointControlAppConfig
+from omegaconf import DictConfig
 from rby1_workbench.control.joint_commands import (
     CartesianCommandSettings,
     JointCommandClient,
@@ -73,7 +73,7 @@ class JointUiState:
 class ViserJointControlPanel:
     """Small joint control panel that sends RB-Y1 commands from jog-style GUI inputs."""
 
-    def __init__(self, cfg: ViserJointControlAppConfig):
+    def __init__(self, cfg: DictConfig):
         self._cfg = cfg
         self._robot = connect_robot(cfg.robot)
         self._command_client = JointCommandClient(self._robot)
@@ -642,6 +642,6 @@ class ViserJointControlPanel:
             logging.exception("Failed to move head to zero")
 
 
-def run_viser_joint_control_panel(cfg: ViserJointControlAppConfig) -> None:
+def run_viser_joint_control_panel(cfg: DictConfig) -> None:
     panel = ViserJointControlPanel(cfg)
     panel.spin()
