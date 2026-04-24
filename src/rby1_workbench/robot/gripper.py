@@ -19,7 +19,7 @@ from typing import Any
 import numpy as np
 import rby1_sdk as rby
 
-from rby1_workbench.config.schema import GripperConfig
+from omegaconf import DictConfig
 
 log = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ class GripperController:
     _DEVICE_IDS = [0, 1]   # [right, left]
     _GRIPPER_DIRECTION = False
 
-    def __init__(self, sdk_robot: Any, cfg: GripperConfig):
+    def __init__(self, sdk_robot: Any, cfg: DictConfig):
         self._robot = sdk_robot
         self._cfg = cfg
         self._bus: Any = None
@@ -322,7 +322,7 @@ class TCPGripperServer:
         # ... 원격 GripperTCPClient가 연결하면 자동으로 그리퍼 구동
         server.stop()
 
-    또는 GripperConfig를 넘기면 host/port 자동 적용::
+    또는 cfg(DictConfig gripper 섹션)를 넘기면 host/port 자동 적용::
 
         server = TCPGripperServer(gripper, cfg=robot._cfg.gripper)
         server.start()
@@ -336,7 +336,7 @@ class TCPGripperServer:
         gripper: GripperController,
         host: str = "0.0.0.0",
         port: int = 5000,
-        cfg: GripperConfig | None = None,
+        cfg: DictConfig | None = None,
     ):
         self._gripper = gripper
         self._host = cfg.tcp_host if cfg else host

@@ -1,57 +1,33 @@
 # Progress Log
 
-## 2026-04-15
+## 2026-04-24
 
 ### Completed
 
-- `rby1-workbench` 프로젝트 골격 생성
-- `pyproject.toml`, README, 기본 Hydra config 추가
-- geometry / robot / viz 코어 모듈 추가
-- `visualize_robot` 앱 추가
-- live FK와 frame graph를 Rerun에 로그하는 MVP 구성
-- public library API 정리
-- console script 추가
-- `examples/` 예제 스크립트 추가
-- 로컬 pip-installable 패키지 방향으로 문서 정리
-- agent handoff용 `docs/AGENT_PROMPT.md` 추가
-- viewer no-frame 상황을 위한 initial-state seed와 callback diagnostics 추가
-- Python import package를 `rby1`에서 `rby1_workbench`로 변경
-- frame XYZ 텍스트를 제거하고 joint 이름 라벨을 표시하도록 변경
-- 기존 Rerun viewer에 `viz.log_meshes=true` 옵션 기반 mesh 시각화 추가
-- `viser` 기반 joint control panel MVP 추가
-- joint command library와 Hydra app entry point 추가
-- SDK example 기반 ready pose preset과 ready pose button 추가
-- joint control 기본값을 SDK example 기준으로 재조정
-- head minimum time을 body와 분리하고, panel send를 non-blocking으로 변경
-- ready pose source를 `22_joint_impedance_control.py` 하나로 고정
-- panel 입력을 slider에서 jog button 중심으로 재구성
-- panel 전송을 공용 `command_stream` 기반으로 통일
-- expired command stream 자동 재생성과 jog 즉시 전송 기본값 추가
-- panel UI를 component tab + number input 기반으로 압축
-- jog/number 입력이 바뀐 component만 보내도록 수정
-- jog/number 입력을 worker queue 대신 callback에서 바로 stream 전송하도록 단순화
-- joint stream command를 `17_teleoperation_with_joint_mapping.py` 흐름에 더 가깝게 재정렬
+- `perception/` 패키지 추가
+- `pyrealsense2` 기반 `RealSenseStream` wrapper 추가
+- `sam3/test.py` 흐름을 참고한 `Sam3RealtimePredictor` wrapper 추가
+- text prompt용 SAM3 grounding 경로 래핑
+- point/box prompt용 SAM3 interactive predictor 경로 래핑
+- OpenCV 기반 live prompt visualizer 추가
+- mouse로 point/box 입력, keyboard로 text prompt 편집 가능하도록 구성
+- RealSense + SAM3 + visualizer를 묶는 realtime runtime loop 추가
+- Hydra app `realtime_sam3_realsense` 추가
+- console script `rby1-realtime-sam3-realsense` 추가
+- example script `examples/realtime_sam3_realsense.py` 추가
+- README / IMPLEMENTATION / DESIGN 문서 갱신
+- visualizer를 color/depth `hconcat` 레이아웃으로 변경
+- visualizer 초기 창 크기 확대
+- multi-instance 추가 / 삭제 / 전환 기능 추가
 
 ### Current State
 
-- 첫 번째 viewer 중심 MVP가 준비된 상태
-- frame-first 구조가 잡혀서 calibration과 control을 얹을 기반이 생김
-- 문서 관리용 `docs/` 체계 추가
-- `Rerun = visualization`, `Viser = input` 방향이 정해짐
+- `rby1-workbench` 안에서 로봇 viewer/control과 별개로 perception 실험을 위한 독립 wrapper 계층이 생김
+- live camera stream에서 text, point, box prompt를 받아 SAM3 결과를 바로 overlay로 볼 수 있음
+- prompt 입력 UI는 OpenCV에 두고, stream/model 쪽은 재사용 가능한 라이브러리 형태로 분리됨
 
-### Next Candidate Steps
+### Notes
 
-1. tool / camera mount frame 정의 추가
-2. EE target gizmo + cartesian impedance control
-3. head camera calibration 데이터 구조 설계
-4. config group 분리
-5. replay / logging 구조 도입
-
-### Working Rule
-
-앞으로 기능 추가 시 아래 문서를 함께 갱신합니다.
-
-- `README.md`
-- `docs/IMPLEMENTATION.md`
-- `docs/DESIGN.md`
-- `docs/PROGRESS.md`
+- 현재 text prompt와 geometry prompt는 동일 UI에서 관리되지만, geometry prompt가 있으면 geometry 추론이 우선됨
+- 기본 SAM3 checkpoint는 `/home/kimm/Workspaces/sam3/sam3.1_multiplex.pt`를 가정
+- local env에 `sam3`, `pyrealsense2`, `opencv-python`이 준비되어 있어야 함

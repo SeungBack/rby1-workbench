@@ -9,8 +9,7 @@ from typing import TYPE_CHECKING, Any, Iterator
 
 import numpy as np
 import rby1_sdk as rby
-
-from rby1_workbench.config.schema import RBY1Config
+from omegaconf import DictConfig
 
 if TYPE_CHECKING:
     from rby1_workbench.robot.gripper import GripperController
@@ -55,7 +54,7 @@ class RBY1:
 
     사용 예::
 
-        cfg = RBY1Config.from_yaml("config/rby1.yaml")
+        cfg = load_rby1_config("config/rby1.yaml")
         robot = RBY1(cfg)
         robot.initialize()                         # connect + power + servo + cm
 
@@ -77,7 +76,7 @@ class RBY1:
         stream.cancel()
     """
 
-    def __init__(self, cfg: RBY1Config):
+    def __init__(self, cfg: DictConfig):
         self._cfg = cfg
         self._robot: Any = None
         self._model: Any = None

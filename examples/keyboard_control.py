@@ -44,7 +44,7 @@ from typing import Any, Callable
 
 import numpy as np
 
-from rby1_workbench import RBY1, RBY1Config
+from rby1_workbench import RBY1, load_rby1_config
 from rby1_workbench.robot.stream import RBY1Stream
 
 # ── 제어 파라미터 ──────────────────────────────────────────────────────
@@ -406,9 +406,9 @@ def _run_ui(stdscr: Any, ctrl: KeyboardController) -> None:
 # ── Entry ─────────────────────────────────────────────────────────────
 def main() -> None:
     parser = argparse.ArgumentParser(description="RBY1 키보드 제어")
-    parser.add_argument("--address", default="192.168.30.1:50051")
-    parser.add_argument("--model",   default="a")
-    parser.add_argument("--config",  default=None, help="rby1.yaml 경로")
+    parser.add_argument("--address", default=None, help="로봇 주소 (기본값: rby1.yaml)")
+    parser.add_argument("--model",   default=None, help="로봇 모델 (기본값: rby1.yaml)")
+    parser.add_argument("--config",  default=None, help="사용자 rby1.yaml 경로")
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -417,9 +417,11 @@ def main() -> None:
         format="%(asctime)s %(levelname)s %(message)s",
     )
 
-    cfg = RBY1Config.from_yaml(args.config) if args.config else RBY1Config(
-        address=args.address, model=args.model
-    )
+    cfg = load_rby1_config(args.config)
+    if args.address:
+        cfg.address = args.address
+    if args.model:
+        cfg.model = args.model
 
     print(f"Connecting to {cfg.address}...")
     robot = RBY1(cfg)

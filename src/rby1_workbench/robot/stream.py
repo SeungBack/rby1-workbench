@@ -13,8 +13,7 @@ from typing import Any
 
 import numpy as np
 import rby1_sdk as rby
-
-from rby1_workbench.config.schema import RBY1Config
+from omegaconf import DictConfig
 
 log = logging.getLogger(__name__)
 
@@ -50,12 +49,13 @@ class RBY1Stream:
             stream.send(...)
     """
 
-    def __init__(self, sdk_robot: Any, cfg: RBY1Config):
+    def __init__(self, sdk_robot: Any, cfg: DictConfig):
         self._robot = sdk_robot
         self._cfg = cfg
         self._stream = sdk_robot.create_command_stream()
         self._last: dict[str, Any] = {}
         self._paused = False
+        self._cancelled = False
         self._first_send = True   # True → 다음 send에서 reset=True 자동 적용
         self._lock = threading.Lock()
 
@@ -82,7 +82,7 @@ class RBY1Stream:
                    None(기본)이면 스트림 시작/재개 후 첫 번째 send에서만 True 자동 적용.
         """
         with self._lock:
-            if self._paused:
+            if self._paused or self._cancelled:
                 return
 
             _reset = self._first_send if reset is None else reset
@@ -97,7 +97,14 @@ class RBY1Stream:
             if cmd is None:
                 return
 
-            self._stream.send_command(cmd)
+            try:
+                self._stream.send_command(cmd)
+            except RuntimeError as e:
+                if "expired" in str(e).lower():
+                    log.warning("Command stream expired; cancelling stream")
+                    self._cancelled = True
+                    return
+                raise
             self._first_send = False
 
             # last 업데이트
@@ -135,8 +142,17 @@ class RBY1Stream:
         """현재 일시정지 상태 여부."""
         return self._paused
 
+    @property
+    def cancelled(self) -> bool:
+        """스트림이 취소된 상태 여부."""
+        return self._cancelled
+
     def cancel(self) -> None:
-        """스트림 취소."""
+        """스트림 취소. 이미 취소된 상태면 no-op."""
+        with self._lock:
+            if self._cancelled:
+                return
+            self._cancelled = True
         try:
             self._stream.cancel()
         except Exception:
@@ -228,8 +244,8 @@ class RBY1Stream:
             rby.CartesianImpedanceControlCommandBuilder()
             .set_command_header(header)
             .set_minimum_time(min_time)
-            .set_joint_stiffness(ci.torso_stiffness)
-            .set_joint_torque_limit(ci.torso_torque_limit)
+            .set_joint_stiffness(list(ci.torso_stiffness))
+            .set_joint_torque_limit(list(ci.torso_torque_limit))
             .set_stop_joint_position_tracking_error(0)
             .set_stop_orientation_tracking_error(0)
             .set_reset_reference(reset)
@@ -273,8 +289,8 @@ class RBY1Stream:
                 rby.CartesianImpedanceControlCommandBuilder()
                 .set_command_header(header)
                 .set_minimum_time(min_time)
-                .set_joint_stiffness(ci.arm_stiffness)
-                .set_joint_torque_limit(ci.arm_torque_limit)
+                .set_joint_stiffness(list(ci.arm_stiffness))
+                .set_joint_torque_limit(list(ci.arm_torque_limit))
                 .set_stop_joint_position_tracking_error(0)
                 .set_stop_orientation_tracking_error(0)
                 .set_reset_reference(reset)

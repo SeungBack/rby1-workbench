@@ -2,8 +2,8 @@
 # RBY1Config dataclass와 1:1 대응
 # robot = RBY1(RBY1Config.from_yaml("path/to/rby1.yaml"))
 
-address: "192.168.30.1:50051"
-model: "a"
+address: "192.168.12.1:50051"
+model: "m"
 power_pattern: ".*"
 servo_pattern: ".*"
 unlimited_mode: true

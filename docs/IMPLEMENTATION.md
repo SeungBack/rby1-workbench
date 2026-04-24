@@ -1,6 +1,6 @@
 # Implementation Status
 
-Last updated: 2026-04-15
+Last updated: 2026-04-24
 
 ## Current Scope
 
@@ -13,6 +13,7 @@ Last updated: 2026-04-15
 - frame graph 구성
 - Rerun 기반 robot frame / skeleton 시각화
 - viser 기반 joint control panel MVP
+- RealSense 입력 + SAM3 prompt segmentation
 
 ## Implemented
 
@@ -33,6 +34,10 @@ Last updated: 2026-04-15
   - `ViserConfig`
   - `JointControlConfig`
   - `ViserJointControlAppConfig`
+  - `RealSenseConfig`
+  - `Sam3Config`
+  - `OpenCVVisualizerConfig`
+  - `RealtimeSam3AppConfig`
 
 ### Geometry
 
@@ -117,16 +122,40 @@ Last updated: 2026-04-15
 - `rby1_workbench.apps.viser_joint_control_panel`
   - Hydra app entry point
 
+### Perception
+
+- `rby1_workbench.perception.realsense`
+  - `RealSenseStream`
+  - `RealSenseFrame`
+  - color/depth stream setup
+  - optional depth-to-color alignment
+  - warmup frame handling
+
+- `rby1_workbench.perception.sam3`
+  - `Sam3RealtimePredictor`
+  - `Sam3PromptState`
+  - text prompt -> SAM3 grounding path
+  - point/box prompt -> SAM3 interactive predictor path
+  - prediction payload normalization for rendering
+
+- `rby1_workbench.perception.visualizer`
+  - OpenCV window wrapper
+  - mouse 기반 point/box prompt 입력
+  - keyboard 기반 text prompt 편집
+  - masks / boxes / scores / depth preview overlay
+
+- `rby1_workbench.perception.realtime_segmentation`
+  - RealSense + SAM3 + visualizer runtime loop
+
+- `rby1_workbench.apps.realtime_sam3_realsense`
+  - Hydra app entry point
+
 ### Examples
 
 - `examples/library_visualize_robot.py`
 - `examples/kinematics_snapshot.py`
 - `examples/library_viser_joint_control.py`
-
-### Agent Handoff
-
-- `docs/AGENT_PROMPT.md`
-  - 다른 code agent가 참고할 수 있는 handoff prompt
+- `examples/realtime_sam3_realsense.py`
 
 ## Not Implemented Yet
 
@@ -134,8 +163,8 @@ Last updated: 2026-04-15
 - head-eye calibration dataset pipeline
 - cartesian impedance / EE target gizmo
 - teleop app migration
-- config group 분리
 - replay / recording pipeline
+- camera calibration dataset capture flow
 
 ## Notes
 
@@ -143,5 +172,5 @@ Last updated: 2026-04-15
 - Python import 이름은 `rby1_workbench`입니다.
 - `visualize_robot`는 현재 기본적으로 읽기 전용입니다.
 - power / servo / control manager enable은 명시적으로 config를 바꿨을 때만 수행됩니다.
-- 현재 viewer는 frame-first 디버깅을 목표로 합니다.
-- `viser_joint_control_panel`은 첫 control MVP이며, cartesian control은 아직 포함하지 않습니다.
+- `realtime_sam3_realsense`는 prompt 입력과 시각화를 OpenCV 창 안에 모아두고, 추론 로직은 wrapper로 분리합니다.
+- SAM3 text prompt와 geometry prompt는 현재 같은 UI에서 다룰 수 있지만, geometry prompt가 있을 때는 geometry 추론을 우선합니다.

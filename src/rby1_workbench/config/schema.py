@@ -95,6 +95,56 @@ class ViserJointControlAppConfig:
     viz: ControlVizConfig = field(default_factory=ControlVizConfig)
 
 
+@dataclass(slots=True)
+class RealSenseConfig:
+    serial_number: str | None = None
+    color_width: int = 640
+    color_height: int = 480
+    depth_width: int = 640
+    depth_height: int = 480
+    fps: int = 30
+    enable_depth: bool = True
+    align_depth_to_color: bool = True
+    warmup_frames: int = 15
+
+
+@dataclass(slots=True)
+class Sam3Config:
+    checkpoint_path: str | None = None
+    device: str = "auto"
+    resolution: int = 1008
+    confidence_threshold: float = 0.5
+    interactive_multimask_output: bool = False
+    enable_compile: bool = False
+    enable_autocast: bool = True
+    autocast_dtype: str = "bfloat16"
+
+
+@dataclass(slots=True)
+class OpenCVVisualizerConfig:
+    window_name: str = "RealSense SAM3"
+    mask_alpha: float = 0.45
+    point_radius: int = 6
+    box_thickness: int = 2
+    show_help: bool = True
+    show_depth: bool = True
+    depth_hconcat: bool = True
+    depth_preview_size: int = 180
+    font_scale: float = 0.5
+    line_height: int = 18
+    wait_key_ms: int = 1
+    initial_window_width: int = 1600
+    initial_window_height: int = 900
+
+
+@dataclass(slots=True)
+class RealtimeSam3AppConfig:
+    realsense: RealSenseConfig = field(default_factory=RealSenseConfig)
+    sam3: Sam3Config = field(default_factory=Sam3Config)
+    visualizer: OpenCVVisualizerConfig = field(default_factory=OpenCVVisualizerConfig)
+    initial_text_prompt: str = ""
+
+
 def load_visualize_robot_config(cfg: DictConfig | Mapping[str, Any]) -> VisualizeRobotConfig:
     """Convert a Hydra/OmegaConf config into dataclasses."""
     if isinstance(cfg, DictConfig):
@@ -128,107 +178,45 @@ def load_viser_joint_control_config(
     )
 
 
+def load_realtime_sam3_config(
+    cfg: DictConfig | Mapping[str, Any],
+) -> RealtimeSam3AppConfig:
+    """Convert a Hydra/OmegaConf config into dataclasses for the SAM3 app."""
+    if isinstance(cfg, DictConfig):
+        data = OmegaConf.to_container(cfg, resolve=True)
+    else:
+        data = dict(cfg)
+
+    realsense_cfg = RealSenseConfig(**data.get("realsense", {}))
+    sam3_cfg = Sam3Config(**data.get("sam3", {}))
+    visualizer_cfg = OpenCVVisualizerConfig(**data.get("visualizer", {}))
+    return RealtimeSam3AppConfig(
+        realsense=realsense_cfg,
+        sam3=sam3_cfg,
+        visualizer=visualizer_cfg,
+        initial_text_prompt=data.get("initial_text_prompt", ""),
+    )
+
+
 def package_root() -> Path:
     return Path(__file__).resolve().parents[3]
 
 
 # ---------------------------------------------------------------------------
-# RBY1 robot control config (새 wrapper용)
+# RBY1 robot control config loader
 # ---------------------------------------------------------------------------
 
-@dataclass
-class CartesianImpedanceStreamConfig:
-    """CartesianImpedanceControlCommandBuilder 파라미터. VR teleop 기본값 사용."""
-    # 팔 (7-DOF)
-    arm_stiffness: list = field(default_factory=lambda: [80.0, 80.0, 80.0, 80.0, 80.0, 80.0, 40.0])
-    arm_torque_limit: list = field(default_factory=lambda: [30.0] * 7)
-    arm_linear_velocity_limit: float = 2.0
-    arm_angular_velocity_limit: float = 6.2831853  # 2*pi
-    arm_linear_accel_limit: float = 20.0
-    arm_angular_accel_limit: float = 251.327412   # 80*pi
-    # 토르소 (6-DOF)
-    torso_stiffness: list = field(default_factory=lambda: [400.0] * 6)
-    torso_torque_limit: list = field(default_factory=lambda: [500.0] * 6)
-    torso_linear_velocity_limit: float = 1.0
-    torso_angular_velocity_limit: float = 1.5707963  # pi/2
-    torso_linear_accel_limit: float = 10.0
-    torso_angular_accel_limit: float = 62.8318530   # 20*pi
-    # 관절 리밋 (joint name → [lower, upper])
-    joint_limits: dict = field(default_factory=lambda: {
-        "right_arm_3": [-2.6, -0.5],
-        "right_arm_5": [0.2, 1.9],
-        "left_arm_3": [-2.6, -0.5],
-        "left_arm_5": [0.2, 1.9],
-        "torso_1": [-0.523598776, 1.3],
-        "torso_2": [-2.617993878, -0.2],
-    })
+def load_rby1_config(path: str | Path | None = None) -> DictConfig:
+    """conf/rby1.yaml 기본값 로드. path가 주어지면 사용자 YAML을 merge (사용자 값 우선).
 
+    Args:
+        path: 사용자 정의 YAML 경로. None이면 패키지 기본값만 사용.
 
-@dataclass
-class StreamConfig:
-    """create_stream() 동작 설정."""
-    dt: float = 0.1  # 제어 주기 [s]; control_hold_time = dt*10, minimum_time = dt*1.01
-    torso_mode: str = "joint_position"        # "joint_position" | "cartesian_impedance"
-    right_arm_mode: str = "cartesian_impedance"
-    left_arm_mode: str = "cartesian_impedance"
-
-
-@dataclass
-class GripperConfig:
-    enabled: bool = False
-    tool_flange_voltage: int = 12
-    tcp_host: str = "0.0.0.0"   # TCPGripperServer bind 주소
-    tcp_port: int = 5000
-
-
-@dataclass
-class RBY1Config:
-    """RBY1 로봇 전체 설정."""
-    address: str = "192.168.30.1:50051"
-    model: str = "a"
-    power_pattern: str = ".*"
-    servo_pattern: str = ".*"
-    unlimited_mode: bool = True
-    state_update_hz: float = 100.0
-    stream: StreamConfig = field(default_factory=StreamConfig)
-    cartesian_impedance: CartesianImpedanceStreamConfig = field(
-        default_factory=CartesianImpedanceStreamConfig
-    )
-    gripper: GripperConfig = field(default_factory=GripperConfig)
-
-    @classmethod
-    def from_dict(cls, d: dict) -> "RBY1Config":
-        d = dict(d)
-        stream = StreamConfig(**d.pop("stream", {}))
-        ci_raw = d.pop("cartesian_impedance", {})
-        ci = CartesianImpedanceStreamConfig(**ci_raw)
-        gripper = GripperConfig(**d.pop("gripper", {}))
-        return cls(stream=stream, cartesian_impedance=ci, gripper=gripper, **d)
-
-    @classmethod
-    def from_yaml(cls, path: str) -> "RBY1Config":
-        import yaml
-        with open(path) as f:
-            data = yaml.safe_load(f)
-        return cls.from_dict(data or {})
-
-    @classmethod
-    def from_hydra(cls, cfg: Any) -> "RBY1Config":
-        """Hydra DictConfig → RBY1Config 변환."""
-        if isinstance(cfg, DictConfig):
-            data = OmegaConf.to_container(cfg, resolve=True)
-        else:
-            data = dict(cfg)
-        return cls.from_dict(data)
-
-    def __repr__(self) -> str:
-        return (
-            f"RBY1Config(address={self.address!r}, model={self.model!r}, "
-            f"unlimited_mode={self.unlimited_mode}, "
-            f"stream=StreamConfig(dt={self.stream.dt}, "
-            f"torso={self.stream.torso_mode!r}, "
-            f"right_arm={self.stream.right_arm_mode!r}, "
-            f"left_arm={self.stream.left_arm_mode!r}), "
-            f"gripper=GripperConfig(enabled={self.gripper.enabled}, "
-            f"tcp={self.gripper.tcp_host}:{self.gripper.tcp_port}))"
-        )
+    Returns:
+        OmegaConf DictConfig. 필드는 cfg.address, cfg.stream.dt 등으로 접근.
+    """
+    default = OmegaConf.load(Path(__file__).parent / "conf" / "rby1.yaml")
+    if path is None:
+        return default
+    user = OmegaConf.load(path)
+    return OmegaConf.merge(default, user)

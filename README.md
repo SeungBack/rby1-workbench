@@ -7,6 +7,7 @@ RB-Y1용 시각화, 좌표계 추적, calibration, control 앱을 한 곳에 모
 - 패키지 구조
 - live robot state + FK + rerun frame viewer
 - viser 기반 joint control panel MVP
+- RealSense + SAM3 realtime segmentation wrapper/app
 
 예정 단계:
 - head camera calibration 파이프라인
@@ -17,7 +18,7 @@ RB-Y1용 시각화, 좌표계 추적, calibration, control 앱을 한 곳에 모
 - [docs/IMPLEMENTATION.md](/home/kimm/Workspaces/rby1-workbench/docs/IMPLEMENTATION.md)
 - [docs/DESIGN.md](/home/kimm/Workspaces/rby1-workbench/docs/DESIGN.md)
 - [docs/PROGRESS.md](/home/kimm/Workspaces/rby1-workbench/docs/PROGRESS.md)
-- [docs/AGENT_PROMPT.md](/home/kimm/Workspaces/rby1-workbench/docs/AGENT_PROMPT.md)
+- [docs/CLAUDE.md](/home/kimm/Workspaces/rby1-workbench/docs/CLAUDE.md)
 
 앞으로 구현을 진행할 때 README와 위 문서들을 함께 갱신합니다.
 
@@ -26,6 +27,7 @@ RB-Y1용 시각화, 좌표계 추적, calibration, control 앱을 한 곳에 모
 - repository name: `rby1-workbench`
 - package metadata name: `rby1-workbench`
 - Python import name: `rby1_workbench`
+- console script: `rby1-realtime-sam3-realsense`
 - console script: `rby1-visualize-robot`
 - console script: `rby1-viser-joint-control`
 
@@ -44,6 +46,28 @@ pip install .
 ```
 
 ## Run
+
+RealSense 컬러/깊이 스트림 위에 SAM3 prompt segmentation 실행:
+
+```bash
+python -m rby1_workbench.apps.realtime_sam3_realsense
+```
+
+console script로 실행:
+
+```bash
+rby1-realtime-sam3-realsense
+```
+
+체크포인트나 카메라 설정 오버라이드:
+
+```bash
+python -m rby1_workbench.apps.realtime_sam3_realsense \
+  sam3.checkpoint_path=/home/kimm/Workspaces/sam3/sam3.1_multiplex.pt \
+  realsense.serial_number=123456789 \
+  realsense.color_width=848 \
+  realsense.color_height=480
+```
 
 console script로 기본 viewer 실행:
 
@@ -126,6 +150,7 @@ run_visualize_robot(cfg)
 - [examples/library_visualize_robot.py](/home/kimm/Workspaces/rby1-workbench/examples/library_visualize_robot.py)
 - [examples/kinematics_snapshot.py](/home/kimm/Workspaces/rby1-workbench/examples/kinematics_snapshot.py)
 - [examples/library_viser_joint_control.py](/home/kimm/Workspaces/rby1-workbench/examples/library_viser_joint_control.py)
+- [examples/realtime_sam3_realsense.py](/home/kimm/Workspaces/rby1-workbench/examples/realtime_sam3_realsense.py)
 
 이 예제들은 저장소 안의 reference example이며, 온라인 패키지 배포를 전제로 한 구성은 아닙니다.
 
@@ -160,6 +185,30 @@ run_visualize_robot(cfg)
 
 `viser`는 이 개발 환경에서 아직 설치 검증을 하지는 못했습니다. 패키지 의존성에는 추가해두었고, 실행 시 env에 `viser`가 있어야 합니다.
 
+`realtime_sam3_realsense`는 다음 환경을 가정합니다.
+- `pyrealsense2`가 설치되어 있고 RealSense 카메라가 연결되어 있어야 합니다.
+- 로컬 `sam3` repo가 같은 워크스페이스에 있고, 해당 env에 `pip install -e /home/kimm/Workspaces/sam3` 형태로 설치되어 있어야 합니다.
+- 기본 체크포인트 경로는 `/home/kimm/Workspaces/sam3/sam3.1_multiplex.pt`입니다.
+- text prompt는 SAM3 grounding 경로를 사용하고, point/box prompt는 SAM3 interactive predictor 경로를 사용합니다.
+- 현재 geometry prompt가 하나라도 있으면 geometry 추론이 우선되고, text prompt는 화면 정보용으로 유지됩니다.
+
+OpenCV 창에서 사용할 기본 조작:
+- `p`: positive point 추가 모드
+- `n`: negative point 추가 모드
+- `b`: box drag 모드
+- `t`: text prompt 편집
+- `i`: 새 instance 추가
+- `d`: active instance 삭제
+- `[` / `]`: instance 전환
+- `c`: active instance의 point/box prompt 초기화
+- `x`: active instance의 모든 prompt 초기화
+- `q`: 종료
+
+현재 기본 시각화 동작:
+- color 결과와 depth를 좌우 `hconcat`으로 함께 표시합니다.
+- 첫 창 크기는 기본적으로 `1600 x 900`으로 엽니다.
+- active instance 하나를 편집하면서, 추론은 등록된 모든 instance에 대해 수행합니다.
+
 ## Package Layout
 
 ```text
@@ -167,6 +216,7 @@ src/rby1_workbench/
   apps/       # 실행 앱
   conf/       # Hydra config
   config/     # structured config
+  perception/ # RealSense / SAM3 / OpenCV prompt wrappers
   control/    # joint command / control panel helpers
   geometry/   # SE3 / transform graph
   robot/      # robot state / joints / FK
