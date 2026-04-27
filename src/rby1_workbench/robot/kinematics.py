@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
@@ -30,6 +30,14 @@ class KinematicResult:
     joint_positions_by_name: dict[str, float]
 
 
+@dataclass(slots=True)
+class _StaticFrame:
+    parent: str
+    child: str
+    T_parent_to_child: np.ndarray
+    label: str
+
+
 class RobotKinematics:
     """Compute named link transforms and frame graph from the latest joint state."""
 
@@ -46,6 +54,30 @@ class RobotKinematics:
         self._dyn_state = self._dyn_robot.make_state(
             self._link_names, self._model.robot_joint_names
         )
+        self._static_frames: list[_StaticFrame] = []
+
+    def register_static_frame(
+        self,
+        parent: str,
+        child: str,
+        T_parent_to_child: np.ndarray,
+        label: str | None = None,
+    ) -> None:
+        """Register a static child frame (e.g., camera calibration result).
+
+        After registration, every compute() call includes this frame in
+        base_transforms, graph, and frame_labels automatically.
+
+        parent must be a robot link name or a previously registered static frame.
+        Frames are processed in registration order, so chained static frames
+        must be registered parent-first.
+        """
+        self._static_frames.append(_StaticFrame(
+            parent=parent,
+            child=child,
+            T_parent_to_child=np.asarray(T_parent_to_child, dtype=np.float64).copy(),
+            label=label if label is not None else child,
+        ))
 
     @property
     def model(self) -> Any:
@@ -83,6 +115,18 @@ class RobotKinematics:
                 relative_transform(base_transforms[parent], base_transforms[child]),
             )
 
+        frame_labels = dict(self._frame_labels)
+
+        for sf in self._static_frames:
+            if sf.parent not in base_transforms:
+                raise KeyError(
+                    f"Static frame parent '{sf.parent}' not found. "
+                    "Register parent frames before child frames."
+                )
+            base_transforms[sf.child] = base_transforms[sf.parent] @ sf.T_parent_to_child
+            graph.add_transform(sf.parent, sf.child, sf.T_parent_to_child)
+            frame_labels[sf.child] = sf.label
+
         skeletons = {
             "torso": self._chain_positions(base_transforms, TORSO_LINK_CHAIN),
             "right_arm": self._chain_positions(base_transforms, RIGHT_ARM_LINK_CHAIN),
@@ -97,7 +141,7 @@ class RobotKinematics:
         return KinematicResult(
             graph=graph,
             base_transforms=base_transforms,
-            frame_labels=dict(self._frame_labels),
+            frame_labels=frame_labels,
             skeletons=skeletons,
             joint_positions_by_name=joint_positions_by_name,
         )

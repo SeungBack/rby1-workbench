@@ -11,6 +11,8 @@ from rby1_workbench.perception.realtime_segmentation import run_realtime_sam3_re
 
 def main() -> None:
     cfg = load_sam3_config()
+    cfg.sam3.enable_compile = False
+    cfg.sam3.resolution = 1008
     cfg.sam3.checkpoint_path = None  # set your model path here
     cfg.visualizer.window_name = "RealSense SAM3 Example"
     cfg.visualizer.show_depth = True

@@ -1,7 +1,7 @@
 """Public library API for rby1-workbench."""
 
 # Config
-from rby1_workbench.config.schema import load_rby1_config, load_sam3_config
+from rby1_workbench.config.schema import load_rby1_config, load_sam3_config, load_calib_config
 
 # Robot wrapper
 from rby1_workbench.robot.rby1 import RBY1
@@ -24,6 +24,13 @@ from rby1_workbench.control.joint_commands import (
     JointGroupSpec,
 )
 from rby1_workbench.control.presets import ready_pose_targets_for_model
+from rby1_workbench.calibration import (
+    BoardConsistency,
+    CharucoDetector,
+    DetectionResult,
+    HandEyeSolver,
+    camera_opticalTforward,
+)
 from rby1_workbench.perception.realtime_segmentation import run_realtime_sam3_realsense
 from rby1_workbench.perception.realsense import RealSenseFrame, RealSenseStream
 from rby1_workbench.perception.sam3 import (
@@ -43,6 +50,7 @@ __all__ = [
     # Config
     "load_rby1_config",
     "load_sam3_config",
+    "load_calib_config",
     # Robot wrapper
     "RBY1",
     "RBY1Stream",
@@ -65,6 +73,12 @@ __all__ = [
     "RobotStateBuffer",
     "StateSnapshot",
     "connect_robot",
+    # Calibration
+    "BoardConsistency",
+    "CharucoDetector",
+    "DetectionResult",
+    "HandEyeSolver",
+    "camera_opticalTforward",
     # Perception
     "OpenCVPromptVisualizer",
     "PromptBox",

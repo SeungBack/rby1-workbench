@@ -88,6 +88,26 @@ class RealSenseStream:
         self._align = None
         self._started = False
 
+    def get_intrinsics(self) -> tuple[np.ndarray, np.ndarray]:
+        """Color stream intrinsics as (K 3×3, D). start() 이후에만 유효."""
+        if not self._started or self._pipeline is None:
+            raise RuntimeError("RealSenseStream.start() must be called first.")
+        rs = self._rs
+        profile = self._pipeline.get_active_profile()
+        intr = (
+            profile.get_stream(rs.stream.color)
+            .as_video_stream_profile()
+            .get_intrinsics()
+        )
+        K = np.array(
+            [[intr.fx, 0.0, intr.ppx],
+             [0.0, intr.fy, intr.ppy],
+             [0.0, 0.0,     1.0     ]],
+            dtype=np.float64,
+        )
+        D = np.array(intr.coeffs, dtype=np.float64)
+        return K, D
+
     def get_frame(self, timeout_ms: int = 5000) -> RealSenseFrame:
         """Return the next available frame bundle."""
         if not self._started or self._pipeline is None:

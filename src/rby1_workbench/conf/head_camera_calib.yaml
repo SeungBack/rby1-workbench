@@ -1,0 +1,44 @@
+# Head camera hand-eye calibration config
+# load_calib_config() 가 기본으로 읽는 packaged YAML
+
+board:
+  cols: 5
+  rows: 7
+  square_len: 0.041       # [m] 체스보드 사각형 한 변
+  marker_len: 0.0327      # [m] ArUco 마커 한 변
+  marker_dict: "DICT_6X6_250"
+
+realsense:
+  serial_number: null
+  color_width: 1280
+  color_height: 720
+  fps: 30
+  enable_depth: false
+  align_depth_to_color: false
+  warmup_frames: 5
+
+robot:
+  head_link: "link_head_2"
+
+output_dir: "outputs"
+calib_method: "PARK"   # TSAI | PARK | HORAUD | ANDREFF | DANIILIDIS
+min_samples: 3
+
+home:
+  head: [0.0, -0.4]                                              # [yaw, pitch] rad
+  torso: [1.89849107e-05, 1.04723426e+00, -1.57075836e+00,
+          7.85390569e-01, 7.59396430e-06, 0.0]                 # 6-DOF rad
+
+auto_capture:
+  yaw_range: 0.25     # [rad] home yaw 기준 ±범위
+  pitch_range: 0.25   # [rad] home pitch 기준 ±범위
+  minimum_time: 0.5   # [s] head 이동 시간
+  torso_noise:      # joint_index: half-range [rad]
+    0: 0.1
+    1: 0.1
+    2: 0.1
+    3: 0.1
+    4: 0.1
+    5: 0.1
+
+

@@ -29,7 +29,10 @@ class HeadController:
         self._model = model
 
     def move(self, yaw: float, pitch: float, minimum_time: float = 2.0) -> bool:
-        """헤드를 지정 yaw/pitch로 이동 (blocking, JointPosition)."""
+        """헤드를 지정 yaw/pitch로 이동 (blocking, JointPosition).
+            yaw: radians
+            pitch: radians
+        """
         dof = len(self._model.head_idx)
         positions = [0.0] * dof
         if dof >= 1:

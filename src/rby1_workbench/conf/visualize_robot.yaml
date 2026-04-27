@@ -9,6 +9,10 @@ robot:
   unlimited_mode_enabled: false
   state_update_hz: 10.0
 
+calib:
+  output_dir: "outputs"
+  auto_load: true
+
 viz:
   application_id: "rby1_visualize_robot"
   spawn_viewer: true

@@ -42,6 +42,19 @@ def run_visualize_robot(cfg: DictConfig) -> None:
             else:
                 logging.warning("Mesh logging requested, but no GLB assets were resolved in %s", mesh_dir)
 
+    calib_cfg = getattr(cfg, "calib", None)
+    if calib_cfg is not None and calib_cfg.auto_load:
+        from rby1_workbench.calibration.hand_eye_solver import (
+            HandEyeSolver,
+        )
+        result = HandEyeSolver.load_latest(calib_cfg.output_dir)
+        if result is not None:
+            T, frame_from, frame_to = result
+            kinematics.register_static_frame(frame_from, frame_to, T)
+            logging.info("Calibration loaded: %s → %s", frame_from, frame_to)
+        else:
+            logging.info("Calibration auto-load: no file found in '%s'.", calib_cfg.output_dir)
+
     rerun_session.init()
     state_buffer.start(cfg.robot.state_update_hz)
 

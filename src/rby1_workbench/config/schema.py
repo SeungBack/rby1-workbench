@@ -29,3 +29,11 @@ def load_sam3_config(path: str | Path | None = None) -> DictConfig:
     if path is None:
         return default
     return OmegaConf.merge(default, OmegaConf.load(path))
+
+
+def load_calib_config(path: str | Path | None = None) -> DictConfig:
+    """packaged `src/rby1_workbench/conf/head_camera_calib.yaml`을 로드한다."""
+    default = OmegaConf.load(_package_conf_path("head_camera_calib.yaml"))
+    if path is None:
+        return default
+    return OmegaConf.merge(default, OmegaConf.load(path))

@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from rby1_workbench.robot.gripper import GripperController
     from rby1_workbench.robot.head import HeadController
     from rby1_workbench.robot.stream import RBY1Stream
+    from rby1_workbench.robot.torso import TorsoController
 
 log = logging.getLogger(__name__)
 
@@ -83,7 +84,9 @@ class RBY1:
         self._dyn_robot: Any = None
         self._dyn_state: Any = None
         self._dyn_lock = threading.Lock()
+        self._kin: Any = None
         self._head_ctrl: HeadController | None = None
+        self._torso_ctrl: TorsoController | None = None
         self._gripper_ctrl: GripperController | None = None
         self._active_stream: RBY1Stream | None = None
 
@@ -100,7 +103,24 @@ class RBY1:
         self._model = self._robot.model()
         self._setup_fk()
         log.info("Connected. Model: %s", self._model.model_name)
+        self._auto_load_calibration()
         return self
+
+    def _auto_load_calibration(self) -> None:
+        calib_cfg = getattr(self._cfg, "calib", None)
+        if calib_cfg is None or not calib_cfg.auto_load:
+            return
+        from rby1_workbench.calibration.hand_eye_solver import (
+            HandEyeSolver,
+        )
+        result = HandEyeSolver.load_latest(calib_cfg.output_dir)
+        if result is None:
+            log.info("Calibration auto-load: no file found in '%s'.", calib_cfg.output_dir)
+            return
+        T, frame_from, frame_to = result
+        self.register_static_frame(frame_from, frame_to, T)
+
+        log.info("Calibration auto-loaded: %s → %s", frame_from, frame_to)
 
     def power_on(self, pattern: str | None = None) -> "RBY1":
         p = pattern or self._cfg.power_pattern
@@ -435,6 +455,44 @@ class RBY1:
             )
         return np.asarray(T, dtype=float).copy()
 
+    def register_static_frame(
+        self,
+        parent: str,
+        child: str,
+        T_parent_to_child: np.ndarray,
+        label: str | None = None,
+    ) -> None:
+        """Static frame 등록 (예: 카메라 교정 결과).
+
+        등록 후 get_transform(parent, child) 및 Rerun 뷰어에서 자동으로 사용됨.
+        connect() 이후에만 호출 가능.
+        """
+        from rby1_workbench.robot.kinematics import RobotKinematics
+        if self._kin is None:
+            self._kin = RobotKinematics(self._robot)
+        self._kin.register_static_frame(parent, child, T_parent_to_child, label=label)
+
+    def get_transform(self, parent: str, child: str) -> np.ndarray:
+        """T_parent→child (4×4). 어떤 named link든 가능. connect() 이후에만 유효.
+
+        Args:
+            parent: 부모 링크 이름 (예: "base")
+            child:  자식 링크 이름 (예: "link_head_2")
+
+        Available links: base, link_torso_0~5, link_right_arm_0~6, ee_right,
+                         link_left_arm_0~6, ee_left, link_head_0~2
+        """
+        from rby1_workbench.geometry.se3 import relative_transform
+        from rby1_workbench.robot.kinematics import RobotKinematics
+        if self._kin is None:
+            self._kin = RobotKinematics(self._robot)
+        q = np.asarray(self._robot.get_state().position, dtype=float)
+        result = self._kin.compute(q)
+        base_T_parent = result.base_transforms[parent]
+        base_T_child  = result.base_transforms[child]
+        parent_T_child = np.linalg.inv(base_T_parent) @ base_T_child
+        return parent_T_child
+
     # ------------------------------------------------------------------
     # Sub-controllers
     # ------------------------------------------------------------------
@@ -445,6 +503,13 @@ class RBY1:
             from rby1_workbench.robot.head import HeadController
             self._head_ctrl = HeadController(self._robot, self._model)
         return self._head_ctrl
+
+    @property
+    def torso(self) -> "TorsoController":
+        if self._torso_ctrl is None:
+            from rby1_workbench.robot.torso import TorsoController
+            self._torso_ctrl = TorsoController(self._robot, self._model)
+        return self._torso_ctrl
 
     @property
     def gripper(self) -> "GripperController":

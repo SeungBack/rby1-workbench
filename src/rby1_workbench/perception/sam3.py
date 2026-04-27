@@ -56,12 +56,13 @@ class Sam3PromptState:
     text: str = ""
     points: list[PromptPoint] = field(default_factory=list)
     box: PromptBox | None = None
+    mask_input: np.ndarray | None = field(default=None, repr=False, compare=False)
 
     def has_text(self) -> bool:
         return bool(self.text.strip())
 
     def has_geometry(self) -> bool:
-        return bool(self.points) or self.box is not None
+        return bool(self.points) or self.box is not None or self.mask_input is not None
 
     def has_any_prompt(self) -> bool:
         return self.has_text() or self.has_geometry()
@@ -69,6 +70,7 @@ class Sam3PromptState:
     def clear_geometry(self) -> None:
         self.points.clear()
         self.box = None
+        self.mask_input = None
 
     def clear_all(self) -> None:
         self.text = ""
@@ -305,24 +307,35 @@ class Sam3RealtimePredictor:
             box = prompt_state.box.as_xyxy()
 
         with self._inference_context(), self._autocast_context():
-            masks, scores, _ = self.model.predict_inst(
+            masks, scores, low_res_masks = self.model.predict_inst(
                 state,
                 point_coords=point_coords,
                 point_labels=point_labels,
                 box=box,
+                mask_input=prompt_state.mask_input,
                 multimask_output=self.config.interactive_multimask_output,
                 return_logits=False,
                 normalize_coords=True,
             )
 
+        # Clear points and box to avoid anchoring the mask to the background when the object moves
+        prompt_state.points.clear()
+        prompt_state.box = None
+
         masks = np.asarray(masks).astype(bool)
         scores = np.asarray(scores, dtype=np.float32)
+        low_res_masks = np.asarray(low_res_masks, dtype=np.float32)
+
         keep = scores >= self.config.confidence_threshold
         if scores.size > 0 and not np.any(keep):
             keep[np.argmax(scores)] = True
         if scores.size > 0:
             masks = masks[keep]
             scores = scores[keep]
+            # Save the low-res mask of the best prediction for tracking in the next frame
+            prompt_state.mask_input = low_res_masks[keep][0:1]
+        else:
+            prompt_state.mask_input = None
 
         boxes = self._boxes_from_masks(masks)
         return masks, scores, boxes
