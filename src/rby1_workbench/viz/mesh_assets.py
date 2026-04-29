@@ -10,12 +10,13 @@ def discover_default_mesh_dir(model_name: str) -> Path | None:
     """Find the SDK mesh directory for the selected robot model."""
     normalized_model = model_name.lower()
     candidates = [
+        Path("/home/kimm/Workspaces/RBY1Teleop/urdf/rby1") / f"rby1{normalized_model}" / "urdf_new" / "meshes",
         Path("/home/kimm/Workspaces/rby1-sdk/models") / f"rby1{normalized_model}" / "urdf" / "meshes",
         Path(__file__).resolve().parents[4] / "rby1-sdk" / "models" / f"rby1{normalized_model}" / "urdf" / "meshes",
     ]
 
     for candidate in candidates:
-        if candidate.is_dir():
+        if candidate.is_dir() and any(candidate.glob("*.glb")):
             return candidate
     return None
 

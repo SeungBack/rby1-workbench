@@ -590,11 +590,8 @@ class ViserKeyboardStylePanel:
 
     def _apply_head_target(self, target: np.ndarray) -> bool:
         target = np.asarray(target, dtype=np.float64)
-        yaw = float(target[0]) if len(target) >= 1 else 0.0
-        pitch = float(target[1]) if len(target) >= 2 else 0.0
-        return self._robot.head.move(
-            yaw=yaw,
-            pitch=pitch,
+        return self._robot.head.move_j(
+            np.asarray(target, dtype=float),
             minimum_time=float(self._cfg.command.head_minimum_time),
         )
 

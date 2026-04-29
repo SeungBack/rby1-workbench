@@ -128,10 +128,18 @@ def main() -> None:
     home_cfg = calib_cfg.home
     q_head_home  = np.asarray(home_cfg.head,  dtype=float)
     q_torso_home = np.asarray(home_cfg.torso, dtype=float)
+    yaw, pitch = float(q_head_home[0]), float(q_head_home[1])
+    q_torso    = q_torso_home.copy()
+    
+    print(robot.get_joint_positions('torso'))
 
     log.info("Moving to home position...")
-    robot.head.move(q_head_home[0], q_head_home[1], minimum_time=float(ac.minimum_time))
-    robot.torso.move_j(q_torso_home, minimum_time=float(ac.minimum_time))
+    robot.ready_pose()
+    print('1')
+    robot.head.move_j(q_head_home)
+    print('2')
+    robot.torso.move_j(q_torso_home, mode='position')
+    print('3')
 
     log.info("Ready. Keys: [s] capture  [m] random move  [c] compute  [d] discard  [q] quit")
 
@@ -154,11 +162,24 @@ def main() -> None:
                     continue
                 try:
                     baseTgripper = robot.get_transform("base", head_link)
-                    print('baseTgripper')
-                    print(baseTgripper)
                 except Exception as e:
                     log.warning("Could not get robot transform: %s", e)
                     continue
+                q_actual_head  = robot.get_joint_positions("head")
+                q_actual_torso = robot.get_joint_positions("torso")
+                log.info(
+                    "HEAD   cmd=[%.3f, %.3f]  actual=[%.3f, %.3f]  err=[%.3f, %.3f] rad",
+                    yaw, pitch,
+                    q_actual_head[0], q_actual_head[1],
+                    yaw - q_actual_head[0], pitch - q_actual_head[1],
+                )
+                log.info(
+                    "TORSO  cmd=%s\n       actual=%s\n       err=%s rad",
+                    np.round(q_torso, 3), np.round(q_actual_torso, 3),
+                    np.round(q_torso - q_actual_torso, 3),
+                )
+                print('baseTgripper:\n', baseTgripper.round(3))
+                print(result.tvec)
                 solver.add_sample(baseTgripper, result.rvec, result.tvec)
                 log.info(
                     "Sample %d  |  ^base T_%s pos: %s",
@@ -175,9 +196,9 @@ def main() -> None:
 
                 yaw, pitch = _random_head_pose(q_head_home, ac.yaw_range, ac.pitch_range, rng)
                 log.info("Moving head → yaw=%.1f° pitch=%.1f°", np.rad2deg(yaw), np.rad2deg(pitch))
-                robot.head.move(yaw, pitch, minimum_time=float(ac.minimum_time))
+                robot.head.move_j(np.array([yaw, pitch]))
                 q_torso = _random_torso_pose(q_torso_home, ac.torso_noise, rng)
-                robot.torso.move_j(q_torso, minimum_time=float(ac.minimum_time))
+                robot.torso.move_j(q_torso, mode='position')
 
             elif key == ord("c"):
                 if solver.n_samples < calib_cfg.min_samples:

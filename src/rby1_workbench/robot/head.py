@@ -16,34 +16,45 @@ class HeadController:
 
     사용 예::
 
-        robot.head.move(yaw=0.2, pitch=-0.1, minimum_time=2.0)
+        robot.head.move_j(np.array([0.2, -0.1]), minimum_time=2.0)
         robot.head.zero()
 
         # EE 중점을 바라보는 yaw/pitch 계산
         yaw, pitch = HeadController.look_at_midpoint(T_right[:3,3], T_left[:3,3])
-        robot.head.move(yaw, pitch)
+        robot.head.move_j(np.array([yaw, pitch]))
     """
 
     def __init__(self, sdk_robot: Any, model: Any):
         self._robot = sdk_robot
         self._model = model
 
-    def move(self, yaw: float, pitch: float, minimum_time: float = 2.0) -> bool:
-        """헤드를 지정 yaw/pitch로 이동 (blocking, JointPosition).
-            yaw: radians
-            pitch: radians
+    def move_j(
+        self,
+        q: np.ndarray,
+        minimum_time: float = 1.0,
+        control_hold_time: float = 1.0,
+    ) -> bool:
+        """헤드를 지정 관절 위치로 이동 (blocking, JointPosition).
+
+        Args:
+            q: [yaw, pitch] (rad)
+            minimum_time: 최소 이동 시간 [s]
+            control_hold_time: target 도달 대기 시간 [s]
         """
+        q = np.asarray(q, dtype=float)
         dof = len(self._model.head_idx)
         positions = [0.0] * dof
         if dof >= 1:
-            positions[0] = float(yaw)
+            positions[0] = float(q[0])
         if dof >= 2:
-            positions[1] = float(pitch)
+            positions[1] = float(q[1])
 
+        header = rby.CommandHeaderBuilder().set_control_hold_time(control_hold_time)
         rv = self._robot.send_command(
             rby.RobotCommandBuilder().set_command(
                 rby.ComponentBasedCommandBuilder().set_head_command(
                     rby.JointPositionCommandBuilder()
+                    .set_command_header(header)
                     .set_minimum_time(minimum_time)
                     .set_position(positions)
                 )
@@ -52,12 +63,12 @@ class HeadController:
         ).get()
         ok = rv.finish_code == rby.RobotCommandFeedback.FinishCode.Ok
         if not ok:
-            log.warning("head.move finished with code: %s", rv.finish_code)
+            log.warning("head.move_j finished with code: %s", rv.finish_code)
         return ok
 
     def zero(self, minimum_time: float = 2.0) -> bool:
         """헤드를 zero pose로 이동."""
-        return self.move(yaw=0.0, pitch=0.0, minimum_time=minimum_time)
+        return self.move_j(np.zeros(2), minimum_time=minimum_time)
 
     @staticmethod
     def look_at_midpoint(
@@ -65,9 +76,6 @@ class HeadController:
         left_ee_pos: np.ndarray,
     ) -> tuple[float, float]:
         """양 EE 중점을 바라보는 (yaw, pitch) 계산.
-
-        VR teleop main.py L332-338 로직. base 프레임 기준 EE 위치를 입력받아
-        헤드가 중점을 향하도록 yaw/pitch를 반환.
 
         Returns:
             (yaw_rad, pitch_rad) — 클리핑 포함.
