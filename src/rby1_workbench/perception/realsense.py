@@ -29,6 +29,7 @@ class RealSenseStream:
         self._pipeline = None
         self._align = None
         self._started = False
+        self._depth_scale: float = 1e-3
 
     @staticmethod
     def _import_rs():
@@ -69,6 +70,13 @@ class RealSenseStream:
 
         self._pipeline = rs.pipeline()
         self._pipeline.start(cfg)
+        if self.config.enable_depth:
+            depth_sensor = (
+                self._pipeline.get_active_profile()
+                .get_device()
+                .first_depth_sensor()
+            )
+            self._depth_scale = float(depth_sensor.get_depth_scale())
         self._align = (
             rs.align(rs.stream.color)
             if self.config.enable_depth and self.config.align_depth_to_color
@@ -87,6 +95,11 @@ class RealSenseStream:
         self._pipeline = None
         self._align = None
         self._started = False
+
+    @property
+    def depth_scale(self) -> float:
+        """Depth unit in metres per raw uint16 count."""
+        return self._depth_scale
 
     def get_intrinsics(self) -> tuple[np.ndarray, np.ndarray]:
         """Color stream intrinsics as (K 3×3, D). start() 이후에만 유효."""

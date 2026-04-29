@@ -13,6 +13,19 @@ calib:
   output_dir: "outputs"
   auto_load: true
 
+realsense:
+  serial_number: null
+  color_width: 1280
+  color_height: 720
+  depth_width: 1280
+  depth_height: 720
+  fps: 30
+  enable_depth: true
+  align_depth_to_color: true
+  warmup_frames: 5
+  pointcloud_stride: 4        # 픽셀 샘플링 간격 (클수록 포인트 수 감소)
+  pointcloud_max_depth_m: 3.0 # 이 거리 이상은 제외
+
 viz:
   application_id: "rby1_visualize_robot"
   spawn_viewer: true

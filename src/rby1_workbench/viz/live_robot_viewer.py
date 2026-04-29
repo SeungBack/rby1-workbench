@@ -6,13 +6,40 @@ import logging
 from pathlib import Path
 import time
 
+import numpy as np
 import rerun as rr
 
 from omegaconf import DictConfig
+from rby1_workbench.perception.realsense import RealSenseFrame, RealSenseStream
 from rby1_workbench.robot.client import RobotStateBuffer, connect_robot
 from rby1_workbench.robot.kinematics import RobotKinematics
 from rby1_workbench.viz.mesh_assets import default_link_mesh_map, discover_default_mesh_dir
 from rby1_workbench.viz.rerun_session import RerunSession
+
+
+def _log_pointcloud(
+    frame: RealSenseFrame,
+    K: np.ndarray,
+    depth_scale: float,
+    T_base_cam: np.ndarray,
+    entity_path: str,
+    stride: int,
+    max_depth_m: float,
+) -> None:
+    depth_m = frame.depth.astype(np.float32) * depth_scale
+    h, w = depth_m.shape
+    ys = np.arange(0, h, stride)
+    xs = np.arange(0, w, stride)
+    yy, xx = np.meshgrid(ys, xs, indexing="ij")
+    z = depth_m[yy, xx]
+    mask = (z > 0.1) & (z < max_depth_m)
+    z = z[mask]
+    x = (xx[mask] - K[0, 2]) * z / K[0, 0]
+    y = (yy[mask] - K[1, 2]) * z / K[1, 1]
+    pts_cam = np.stack([x, y, z], axis=1)
+    colors = frame.color_rgb[yy[mask], xx[mask]]
+    pts_world = pts_cam @ T_base_cam[:3, :3].T + T_base_cam[:3, 3]
+    rr.log(entity_path, rr.Points3D(pts_world, colors=colors, radii=0.005))
 
 
 def run_visualize_robot(cfg: DictConfig) -> None:
@@ -54,6 +81,19 @@ def run_visualize_robot(cfg: DictConfig) -> None:
             logging.info("Calibration loaded: %s → %s", frame_from, frame_to)
         else:
             logging.info("Calibration auto-load: no file found in '%s'.", calib_cfg.output_dir)
+
+    cam: RealSenseStream | None = None
+    cam_K: np.ndarray | None = None
+    rs_cfg = getattr(cfg, "realsense", None)
+    if rs_cfg is not None:
+        try:
+            cam = RealSenseStream(rs_cfg)
+            cam.start()
+            cam_K, _ = cam.get_intrinsics()
+            logging.info("RealSense started (depth scale: %.6f m/count)", cam.depth_scale)
+        except Exception as e:
+            logging.warning("RealSense init failed, point cloud disabled: %s", e)
+            cam = None
 
     rerun_session.init()
     state_buffer.start(cfg.robot.state_update_hz)
@@ -135,8 +175,26 @@ def run_visualize_robot(cfg: DictConfig) -> None:
                         result.joint_positions_by_name[joint_name],
                     )
 
+            if cam is not None and cam_K is not None and "camera_optical" in result.base_transforms:
+                try:
+                    frame = cam.get_frame()
+                    if frame.depth is not None:
+                        _log_pointcloud(
+                            frame,
+                            cam_K,
+                            cam.depth_scale,
+                            result.base_transforms["camera_optical"],
+                            f"{cfg.viz.world_frame}/camera/points",
+                            stride=int(getattr(rs_cfg, "pointcloud_stride", 4)),
+                            max_depth_m=float(getattr(rs_cfg, "pointcloud_max_depth_m", 3.0)),
+                        )
+                except Exception as e:
+                    logging.debug("Point cloud frame skipped: %s", e)
+
             time.sleep(1.0 / cfg.robot.state_update_hz)
     except KeyboardInterrupt:
         logging.info("Stopping robot visualization.")
     finally:
         state_buffer.stop()
+        if cam is not None:
+            cam.stop()

@@ -196,7 +196,7 @@ def main() -> None:
 
                 yaw, pitch = _random_head_pose(q_head_home, ac.yaw_range, ac.pitch_range, rng)
                 log.info("Moving head → yaw=%.1f° pitch=%.1f°", np.rad2deg(yaw), np.rad2deg(pitch))
-                robot.head.move_j(np.array([yaw, pitch]))
+                # robot.head.move_j(np.array([yaw, pitch]))
                 q_torso = _random_torso_pose(q_torso_home, ac.torso_noise, rng)
                 robot.torso.move_j(q_torso, mode='position')
 
@@ -210,11 +210,9 @@ def main() -> None:
                 try:
                     gripperTcam = solver.solve(method=calib_cfg.calib_method)
                     diagnostics = solver.board_consistency(gripperTcam)
-                    inverse_diagnostics = solver.board_consistency(np.linalg.inv(gripperTcam))
                 except Exception as e:
                     log.error("Calibration solve failed: %s", e)
                     continue
-                # gripperTcam = np.linalg.inv(gripperTcam)
                 gripperTcam_forward = gripperTcam @ camera_opticalTforward()
                 log.info("%sTcam (^%s T_camera_optical):\n%s", head_link, head_link, gripperTcam.round(6))
                 log.info("Camera origin in %s (m): %s", head_link, gripperTcam[:3, 3].round(6))
@@ -234,17 +232,11 @@ def main() -> None:
                     diagnostics.motion_max_rotation_deg,
                     diagnostics.motion_max_translation_m,
                 )
-                log.info(
-                    "Inverse-candidate board error | max pos err: %.4f m, max rot err: %.2f deg",
-                    inverse_diagnostics.translation_max_error_m,
-                    inverse_diagnostics.rotation_max_error_deg,
-                )
                 path = solver.save(
                     gripperTcam,
                     calib_cfg.output_dir,
                     hand_link=head_link,
                     diagnostics=diagnostics,
-                    inverse_candidate_diagnostics=inverse_diagnostics,
                 )
                 log.info("Saved → %s", path)
 
