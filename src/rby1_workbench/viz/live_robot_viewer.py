@@ -77,14 +77,16 @@ def run_visualize_robot(cfg: DictConfig) -> None:
     if calib_cfg is not None and calib_cfg.auto_load:
         from rby1_workbench.calibration.hand_eye_solver import (
             HandEyeSolver,
+            resolve_calibration_output_dir,
         )
-        result = HandEyeSolver.load_latest(calib_cfg.output_dir)
+        output_dir = resolve_calibration_output_dir(calib_cfg.output_dir)
+        result = HandEyeSolver.load_latest(output_dir)
         if result is not None:
             T, frame_from, frame_to = result
             kinematics.register_static_frame(frame_from, frame_to, T)
             logging.info("Calibration loaded: %s → %s", frame_from, frame_to)
         else:
-            logging.info("Calibration auto-load: no file found in '%s'.", calib_cfg.output_dir)
+            logging.info("Calibration auto-load: no file found in '%s'.", output_dir)
 
     cam = None
     cam_K: np.ndarray | None = None

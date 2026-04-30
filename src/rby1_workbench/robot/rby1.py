@@ -211,11 +211,15 @@ class _DirectBackend:
         calib_cfg = getattr(self._cfg, "calib", None)
         if calib_cfg is None or not calib_cfg.auto_load:
             return
-        from rby1_workbench.calibration.hand_eye_solver import HandEyeSolver
+        from rby1_workbench.calibration.hand_eye_solver import (
+            HandEyeSolver,
+            resolve_calibration_output_dir,
+        )
 
-        result = HandEyeSolver.load_latest(calib_cfg.output_dir)
+        output_dir = resolve_calibration_output_dir(calib_cfg.output_dir)
+        result = HandEyeSolver.load_latest(output_dir)
         if result is None:
-            log.info("Calibration auto-load: no file found in '%s'.", calib_cfg.output_dir)
+            log.info("Calibration auto-load: no file found in '%s'.", output_dir)
             return
         transform, frame_from, frame_to = result
         self.register_static_frame(frame_from, frame_to, transform)

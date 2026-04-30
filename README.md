@@ -105,7 +105,8 @@ cameras:
 ### Head Camera Calibration
 
 head 카메라 hand-eye 캘리브레이션 (eye-in-hand, ChArUco board).
-캘리브레이션 결과는 `outputs/` 에 저장되고 visualize_robot 실행 시 자동 로드된다.
+캘리브레이션 결과는 기본적으로 repo root의 `outputs/` 에 저장되고 visualize_robot 실행 시 자동 로드된다.
+현재 작업 디렉토리와 무관하게 같은 위치를 사용하며, 다른 위치를 원하면 `output_dir`에 절대경로를 지정하면 된다.
 
 **사전 조건:** 카메라 서버 실행, 로봇 연결
 
@@ -235,13 +236,18 @@ cfg = VisualizeRobotConfig(
 run_visualize_robot(cfg)
 ```
 
-추가 예시는 아래 파일들을 참고하면 됩니다.
+제어 예제는 [examples/robot_quickstart.py](/home/kimm/Workspaces/rby1-workbench/examples/robot_quickstart.py)부터 보면 됩니다.
 
 - [examples/robot_quickstart.py](/home/kimm/Workspaces/rby1-workbench/examples/robot_quickstart.py)
-- [examples/library_visualize_robot.py](/home/kimm/Workspaces/rby1-workbench/examples/library_visualize_robot.py)
-- [examples/kinematics_snapshot.py](/home/kimm/Workspaces/rby1-workbench/examples/kinematics_snapshot.py)
-- [examples/library_viser_joint_control.py](/home/kimm/Workspaces/rby1-workbench/examples/library_viser_joint_control.py)
+  `status`, `move`, `stream` subcommand를 한 파일에 모은 입문 예제입니다.
+  `--backend client --endpoint ...` 를 붙이면 같은 흐름을 `RBY1(..., backend="client")` 로도 실행할 수 있습니다.
 
+추가 reference:
+
+- [examples/keyboard_control.py](/home/kimm/Workspaces/rby1-workbench/examples/keyboard_control.py)
+  curses 기반 고급 제어 예제입니다.
+- [examples/robot_control_basic.py](/home/kimm/Workspaces/rby1-workbench/examples/robot_control_basic.py)
+  상태 읽기, impedance, streaming, pause/resume interleave까지 한 번에 점검하는 smoke test입니다.
 
 이 예제들은 저장소 안의 reference example이며, 온라인 패키지 배포를 전제로 한 구성은 아닙니다.
 
@@ -321,7 +327,6 @@ src/rby1_workbench/
   viz/                       # Rerun logging / mesh assets
 
 examples/                    # 라이브러리 사용 레퍼런스 (console script 없음)
-  check_robot_status.py
   robot_quickstart.py
   keyboard_control.py
   robot_control_basic.py

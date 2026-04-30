@@ -26,7 +26,7 @@ realsense:                    # mode: "direct" 시 사용
 robot:
   head_link: "link_head_2"
 
-output_dir: "outputs"
+output_dir: "outputs"        # 절대경로 또는 repo root 기준 상대경로
 min_samples: 3
 
 home:
@@ -46,5 +46,4 @@ auto_capture:
     3: 0.3
     4: 0.5
     5: 0.5
-
 

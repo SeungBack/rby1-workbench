@@ -17,6 +17,7 @@ dependencies = [
     "rerun-sdk>=0.20",
     "rby1-sdk",
     "viser",
+    "zmq"
 ]
 
 [project.scripts]

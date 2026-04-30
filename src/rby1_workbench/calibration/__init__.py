@@ -5,6 +5,7 @@ from rby1_workbench.calibration.hand_eye_solver import (
     BoardConsistency,
     HandEyeSolver,
     camera_opticalTforward,
+    resolve_calibration_output_dir,
 )
 
 __all__ = [
@@ -13,4 +14,5 @@ __all__ = [
     "DetectionResult",
     "HandEyeSolver",
     "camera_opticalTforward",
+    "resolve_calibration_output_dir",
 ]

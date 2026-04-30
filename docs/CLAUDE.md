@@ -49,9 +49,9 @@ rby1-workbench/
       viser_joint_control_panel.py
       realtime_sam3_realsense.py
   examples/
+    robot_quickstart.py
     robot_control_basic.py
     keyboard_control.py
-    realtime_sam3_realsense.py
   docs/
     IMPLEMENTATION.md
     PROGRESS.md
@@ -204,13 +204,13 @@ min_time = dt * 1.01
 
 ### `examples/robot_quickstart.py`
 
-- `RBY1`의 최소 direct 사용 예제
-- 기본 실행은 연결 + 상태 조회만 수행
-- `--run-motion`, `--stream-demo`로 `move()` / `open_stream().send()` 흐름 확인
+- `RBY1` 입문 예제
+- `status`, `move`, `stream` subcommand로 핵심 흐름만 보여줌
+- `--backend client --endpoint ...` 로 `RBY1(..., backend="client")` 사용 흐름도 함께 보여줌
 
 ### `examples/robot_control_basic.py`
 
-- `load_rby1_config()`로 설정 로드
+- 입문 예제보다는 comprehensive smoke/integration test
 - 상태 읽기, zero/ready pose, head, joint impedance, cartesian streaming, pause/resume interleave까지 순차 테스트
 
 ### `examples/keyboard_control.py`
@@ -218,11 +218,6 @@ min_time = dt * 1.01
 - curses 기반 터미널 UI
 - joint mode + cartesian streaming mode 모두 포함
 - background streaming thread와 blocking command interleave 패턴 예제
-
-### `examples/realtime_sam3_realsense.py`
-
-- `load_sam3_config()` 사용
-- OpenCV visualizer와 SAM3 runtime을 programmatic하게 실행하는 최소 예제
 
 ## 자주 실수하는 것들
 
@@ -241,7 +236,7 @@ min_time = dt * 1.01
 - config dataclass 제거 및 DictConfig loader 기반으로 전면 전환
 - `RBY1`, `RBY1Stream`, head/gripper wrapper
 - live robot viewer / viser joint control panel / realtime SAM3 app
-- 예제: `robot_control_basic.py`, `keyboard_control.py`, `realtime_sam3_realsense.py`
+- 예제: `robot_quickstart.py`, `robot_control_basic.py`, `keyboard_control.py`
 - stream 안정성 수정: cancel idempotent, expired send 방어, ListConfig 정규화
 
 아직 unresolved 또는 후속 검토가 필요한 것:

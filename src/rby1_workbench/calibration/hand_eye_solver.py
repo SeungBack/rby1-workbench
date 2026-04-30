@@ -11,6 +11,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from rby1_workbench.config.schema import package_root
+
 log = logging.getLogger(__name__)
 
 _METHODS: dict[str, int] = {
@@ -94,6 +96,14 @@ def camera_opticalTforward() -> np.ndarray:
     T = np.eye(4, dtype=np.float64)
     T[:3, :3] = np.diag([-1.0, 1.0, -1.0])
     return T
+
+
+def resolve_calibration_output_dir(output_dir: str | Path) -> Path:
+    """Resolve output_dir to an absolute path independent from cwd."""
+    path = Path(output_dir).expanduser()
+    if path.is_absolute():
+        return path
+    return package_root() / path
 
 
 def _diagnostics_to_json(diagnostics: BoardConsistency) -> dict[str, object]:
@@ -280,7 +290,7 @@ class HandEyeSolver:
         Returns (gripperTcam, frame_from, frame_to), or None if no file found.
         Files are sorted by filename (timestamp-based), so newest = last alphabetically.
         """
-        out = Path(output_dir)
+        out = resolve_calibration_output_dir(output_dir)
         if not out.exists():
             return None
         files = sorted(out.glob("head_camera_calib_*.json"))
@@ -298,7 +308,7 @@ class HandEyeSolver:
         inverse_candidate_diagnostics: BoardConsistency | None = None,
     ) -> Path:
         """Save result to a timestamped JSON file. Returns the saved path."""
-        out = Path(output_dir)
+        out = resolve_calibration_output_dir(output_dir)
         out.mkdir(parents=True, exist_ok=True)
 
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S")

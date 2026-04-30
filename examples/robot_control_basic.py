@@ -1,6 +1,7 @@
-"""rby1-workbench wrapper 기능 테스트.
+"""rby1-workbench control smoke test.
 
-각 기능을 단계별로 순서대로 테스트하고 결과를 출력한다.
+처음 보는 사용자를 위한 입문 예제라기보다,
+제어 기능을 한 번에 점검하는 통합 smoke/integration 스크립트다.
 
 실행:
     python examples/robot_control_basic.py

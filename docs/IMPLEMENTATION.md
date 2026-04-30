@@ -156,7 +156,6 @@ Last updated: 2026-04-24
 - `examples/robot_quickstart.py`
 - `examples/robot_control_basic.py`
 - `examples/keyboard_control.py`
-- `examples/realtime_sam3_realsense.py`
 
 ## Not Implemented Yet
 

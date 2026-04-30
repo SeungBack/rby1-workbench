@@ -119,6 +119,9 @@ def _infer_and_log(
         empty_grasp_min_points=inf_cfg.get("empty_grasp_min_points", 0),
         segm_erosion_k=inf_cfg.get("segm_erosion_k", 0),
     )
+    # sort and select top 50
+    gg = gg.nms(translation_thresh=0.03, rotation_thresh=30.0 / 180.0 * np.pi)
+    gg = gg.sort_by_score()[:50]
     log.info("frame %d: %d grasps", frame_idx, len(gg))
 
     vis_sample = {
@@ -143,7 +146,9 @@ def run_found_grasp(cfg) -> None:
     K, _ = cam.get_intrinsics()
     depth_scale = cam.depth_scale
 
-    rr.init(cfg.viz.application_id, spawn=cfg.viz.spawn_viewer)
+    rr.init(cfg.viz.application_id, spawn=False)
+    if cfg.viz.spawn_viewer:
+        rr.spawn(port=int(getattr(cfg.viz, "port", 9877)))
 
     cv2.namedWindow("FoundGrasp", cv2.WINDOW_NORMAL)
     cv2.resizeWindow("FoundGrasp", 1280, 720)
