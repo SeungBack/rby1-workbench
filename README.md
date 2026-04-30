@@ -14,6 +14,10 @@ RB-Y1용 시각화, 좌표계 추적, calibration, control 앱을 한 곳에 모
 - head camera calibration 파이프라인
 - 기본 grasping 기능 통합
 
+## TODO
+
+- [ ] outputs 등의 경로가 rby1-workbench 기준으로 설정되어 있음.
+
 ## Documentation
 
 - [docs/IMPLEMENTATION.md](/home/kimm/Workspaces/rby1-workbench/docs/IMPLEMENTATION.md)

@@ -10,7 +10,7 @@ def discover_default_mesh_dir(model_name: str) -> Path | None:
     """Find the SDK mesh directory for the selected robot model."""
     normalized_model = model_name.lower()
     candidates = [
-        Path("/home/kimm/Workspaces/RBY1Teleop/urdf/rby1") / f"rby1{normalized_model}" / "urdf_new" / "meshes",
+        # Path("/home/kimm/Workspaces/RBY1Teleop/urdf/rby1") / f"rby1{normalized_model}" / "urdf_new" / "meshes",
         Path("/home/kimm/Workspaces/rby1-sdk/models") / f"rby1{normalized_model}" / "urdf" / "meshes",
         Path(__file__).resolve().parents[4] / "rby1-sdk" / "models" / f"rby1{normalized_model}" / "urdf" / "meshes",
     ]
@@ -47,9 +47,9 @@ def default_link_mesh_map(mesh_dir: Path) -> dict[str, Path]:
         "link_left_arm_6": "LINK_20.glb",
         "ee_right": "EE_BODY.glb",
         "ee_left": "EE_BODY.glb",
-        "link_head_0": "PAN_TILT_1.glb",
-        "link_head_1": "PAN_TILT_2.glb",
-        "link_head_2": "PAN_TILT_3.glb",
+        "link_head_0": "NECK_0.glb",
+        "link_head_1": "NECK_1.glb",
+        "link_head_2": "NECK_2.glb",
     }
 
     mesh_paths: dict[str, Path] = {}

@@ -18,7 +18,7 @@ realsense:
   warmup_frames: 5
 
 robot:
-  head_link: "link_head_0"
+  head_link: "link_head_2"
 
 output_dir: "outputs"
 calib_method: "PARK"   # TSAI | PARK | HORAUD | ANDREFF | DANIILIDIS

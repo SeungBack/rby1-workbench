@@ -104,12 +104,14 @@ def main() -> None:
 
     # ── Robot (connect only — calibration works with servo off) ──────────
     robot = RBY1(robot_cfg)
+    robot.initialize()
     try:
         robot.connect()
     except Exception as e:
         log.error("Robot connection failed: %s", e)
         sys.exit(1)
     
+
     
 
     # ── Camera ───────────────────────────────────────────────────────────
@@ -131,15 +133,10 @@ def main() -> None:
     yaw, pitch = float(q_head_home[0]), float(q_head_home[1])
     q_torso    = q_torso_home.copy()
     
-    print(robot.get_joint_positions('torso'))
-
     log.info("Moving to home position...")
     robot.ready_pose()
-    print('1')
     robot.head.move_j(q_head_home)
-    print('2')
     robot.torso.move_j(q_torso_home, mode='position')
-    print('3')
 
     log.info("Ready. Keys: [s] capture  [m] random move  [c] compute  [d] discard  [q] quit")
 
@@ -178,8 +175,6 @@ def main() -> None:
                     np.round(q_torso, 3), np.round(q_actual_torso, 3),
                     np.round(q_torso - q_actual_torso, 3),
                 )
-                print('baseTgripper:\n', baseTgripper.round(3))
-                print(result.tvec)
                 solver.add_sample(baseTgripper, result.rvec, result.tvec)
                 log.info(
                     "Sample %d  |  ^base T_%s pos: %s",

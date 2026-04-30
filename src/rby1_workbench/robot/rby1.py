@@ -482,10 +482,12 @@ class RBY1:
         Available links: base, link_torso_0~5, link_right_arm_0~6, ee_right,
                          link_left_arm_0~6, ee_left, link_head_0~2
         """
+        from omegaconf import OmegaConf
         from rby1_workbench.geometry.se3 import relative_transform
         from rby1_workbench.robot.kinematics import RobotKinematics
         if self._kin is None:
-            self._kin = RobotKinematics(self._robot)
+            flip = list(OmegaConf.select(self._cfg, "kinematics.flip_joints", default=[]))
+            self._kin = RobotKinematics(self._robot, flip_joints=flip)
         q = np.asarray(self._robot.get_state().position, dtype=float)
         result = self._kin.compute(q)
         base_T_parent = result.base_transforms[parent]

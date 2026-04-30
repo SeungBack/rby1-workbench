@@ -47,6 +47,9 @@ gripper:
   tcp_host: "0.0.0.0"
   tcp_port: 5000
 
+kinematics:
+  flip_joints: ["head_1"]  # physical axis opposed to URDF declaration
+
 calib:
   output_dir: "outputs"   # 교정 결과 저장/로드 디렉토리
   auto_load: true          # connect() 시 가장 최근 교정 결과 자동 등록

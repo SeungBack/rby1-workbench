@@ -9,7 +9,7 @@ import time
 import numpy as np
 import rerun as rr
 
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from rby1_workbench.perception.realsense import RealSenseFrame, RealSenseStream
 from rby1_workbench.robot.client import RobotStateBuffer, connect_robot
 from rby1_workbench.robot.kinematics import RobotKinematics
@@ -47,7 +47,10 @@ def run_visualize_robot(cfg: DictConfig) -> None:
     logging.info("Connecting to RB-Y1 at %s", cfg.robot.address)
     robot = connect_robot(cfg.robot)
     state_buffer = RobotStateBuffer(robot)
-    kinematics = RobotKinematics(robot)
+    urdf_path = getattr(cfg.robot, "urdf_path", None)
+    urdf_data = Path(urdf_path).read_text() if urdf_path else ""
+    flip = list(OmegaConf.select(cfg.robot, "kinematics.flip_joints", default=[]))
+    kinematics = RobotKinematics(robot, urdf_data=urdf_data, flip_joints=flip)
     rerun_session = RerunSession(cfg.viz)
     mesh_paths = None
 

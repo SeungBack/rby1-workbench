@@ -41,10 +41,15 @@ class _StaticFrame:
 class RobotKinematics:
     """Compute named link transforms and frame graph from the latest joint state."""
 
-    def __init__(self, robot: Any):
+    def __init__(self, robot: Any, urdf_data: str = "", flip_joints: list[str] | None = None):
         self._robot = robot
         self._model = robot.model()
-        self._dyn_robot = robot.get_dynamics()
+        self._dyn_robot = robot.get_dynamics(urdf_data)
+        flip_set = set(flip_joints or [])
+        self._flip_indices: list[int] = [
+            i for i, name in enumerate(self._model.robot_joint_names)
+            if name in flip_set
+        ]
         self._link_names = unique_link_order()
         self._link_index = {
             name: index for index, name in enumerate(self._link_names)
@@ -90,7 +95,11 @@ class RobotKinematics:
     def compute(self, joint_positions: np.ndarray) -> KinematicResult:
         q = np.asarray(joint_positions, dtype=np.float64).copy()
 
-        self._dyn_state.set_q(q)
+        q_fk = q.copy()
+        for idx in self._flip_indices:
+            q_fk[idx] = -q_fk[idx]
+
+        self._dyn_state.set_q(q_fk)
         self._dyn_robot.compute_forward_kinematics(self._dyn_state)
 
         base_transforms: dict[str, np.ndarray] = {"base": identity()}

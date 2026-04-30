@@ -1,6 +1,9 @@
 robot:
   address: "192.168.12.1:50051"
   model: "m"
+  urdf_path: "/home/kimm/Workspaces/rby1-sdk/models/rby1m/urdf/model_v1.2.urdf"
+  kinematics:
+    flip_joints: ["head_1"]  # physical axis opposed to URDF declaration
   power: ".*"
   servo: ".*"
   auto_power_on: false
