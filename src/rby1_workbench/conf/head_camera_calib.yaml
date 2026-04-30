@@ -21,7 +21,6 @@ robot:
   head_link: "link_head_2"
 
 output_dir: "outputs"
-calib_method: "PARK"   # TSAI | PARK | HORAUD | ANDREFF | DANIILIDIS
 min_samples: 3
 
 home:

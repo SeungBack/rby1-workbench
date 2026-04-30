@@ -191,7 +191,7 @@ def main() -> None:
 
                 yaw, pitch = _random_head_pose(q_head_home, ac.yaw_range, ac.pitch_range, rng)
                 log.info("Moving head → yaw=%.1f° pitch=%.1f°", np.rad2deg(yaw), np.rad2deg(pitch))
-                # robot.head.move_j(np.array([yaw, pitch]))
+                robot.head.move_j(np.array([yaw, pitch]))
                 q_torso = _random_torso_pose(q_torso_home, ac.torso_noise, rng)
                 robot.torso.move_j(q_torso, mode='position')
 
@@ -203,8 +203,7 @@ def main() -> None:
                     )
                     continue
                 try:
-                    gripperTcam = solver.solve(method=calib_cfg.calib_method)
-                    diagnostics = solver.board_consistency(gripperTcam)
+                    gripperTcam, best_method, diagnostics = solver.solve_best()
                 except Exception as e:
                     log.error("Calibration solve failed: %s", e)
                     continue
@@ -213,12 +212,11 @@ def main() -> None:
                 log.info("Camera origin in %s (m): %s", head_link, gripperTcam[:3, 3].round(6))
                 log.info(
                     "%sTcam_forward (^%s T_camera_forward):\n%s",
-                    head_link,
-                    head_link,
-                    gripperTcam_forward.round(6),
+                    head_link, head_link, gripperTcam_forward.round(6),
                 )
                 log.info(
-                    "Board consistency after solve | max pos err: %.4f m, max rot err: %.2f deg",
+                    "Best method: %s | pos_max: %.4f m  rot_max: %.2f deg",
+                    best_method,
                     diagnostics.translation_max_error_m,
                     diagnostics.rotation_max_error_deg,
                 )
@@ -232,6 +230,7 @@ def main() -> None:
                     calib_cfg.output_dir,
                     hand_link=head_link,
                     diagnostics=diagnostics,
+                    method=best_method,
                 )
                 log.info("Saved → %s", path)
 

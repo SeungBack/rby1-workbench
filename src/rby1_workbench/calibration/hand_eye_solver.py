@@ -188,6 +188,35 @@ class HandEyeSolver:
         
         return gripperTcam
 
+    def solve_best(self) -> tuple[np.ndarray, str, "BoardConsistency"]:
+        """Try all methods, return (gripperTcam, method_name, diagnostics) for the best.
+
+        Best = lowest translation_max_error_m from board_consistency.
+        All results are logged so you can compare.
+        """
+        results: list[tuple[str, np.ndarray, BoardConsistency]] = []
+        for name in _METHODS:
+            try:
+                T = self.solve(name)
+                diag = self.board_consistency(T)
+                results.append((name, T, diag))
+            except Exception as e:
+                log.debug("Method %s failed: %s", name, e)
+
+        if not results:
+            raise RuntimeError("All calibration methods failed.")
+
+        results.sort(key=lambda x: x[2].translation_max_error_m)
+        log.info("Board consistency per method:")
+        for name, _, diag in results:
+            marker = " ← best" if name == results[0][0] else ""
+            log.info(
+                "  %-12s  pos_max: %.4f m  rot_max: %.2f deg%s",
+                name, diag.translation_max_error_m, diag.rotation_max_error_deg, marker,
+            )
+        best_name, best_T, best_diag = results[0]
+        return best_T, best_name, best_diag
+
     def board_poses_in_base(self, gripperTcam: np.ndarray) -> list[np.ndarray]:
         """Return ^base T_board for each captured sample.
 
@@ -265,6 +294,7 @@ class HandEyeSolver:
         output_dir: str,
         hand_link: str = "link_head_2",
         diagnostics: BoardConsistency | None = None,
+        method: str = "",
         inverse_candidate_diagnostics: BoardConsistency | None = None,
     ) -> Path:
         """Save result to a timestamped JSON file. Returns the saved path."""
@@ -285,6 +315,7 @@ class HandEyeSolver:
             "transform_notation": "^gripper T_camera",
             "derived_frame_to": "camera_forward",
             "calibration_type": "eye-in-hand",
+            "calib_method":    method,
             "n_samples":       self.n_samples,
             "timestamp":       stamp,
             "matrix":          gripperTcam.tolist(),
