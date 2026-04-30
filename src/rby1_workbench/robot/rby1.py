@@ -847,7 +847,7 @@ class RBY1:
     def move(
         self,
         *,
-        mode: str = "joint",
+        mode: str = "impedance",
         torso: np.ndarray | None = None,
         right_arm: np.ndarray | None = None,
         left_arm: np.ndarray | None = None,

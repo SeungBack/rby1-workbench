@@ -1,3 +1,17 @@
+robot:
+  address: "192.168.12.1:50051"
+  model: "m"
+  backend: "direct"        # "direct" | "client"
+  endpoint: null           # backend="client" 시 사용
+  move_to_startup_pose: true
+  startup_pose:
+    mode: "joint"          # "ready" | "zero" | "joint"
+    minimum_time: 5.0
+    torso: [0.0, 0.436, -0.873, 0.96, 0.0, 0.0]  # rad
+    right_arm: [-0.878, -1.354, 0.819, -2.222, -1.043, 1.436, -0.861]
+    left_arm: [-0.524, 0.087, -0.0, -1.571, 0.0, 1.571, 0.0]  # rad
+    head: [0.0, -0.3]  # rad
+
 camera_source:
   mode: "server"           # "server" or "direct"
   name: "head"
@@ -14,3 +28,29 @@ viz:
   application_id: "rby1_found_grasp"
   spawn_viewer: true
   port: 9877
+
+execution:
+  mode: "viz_only"         # "off" | "viz_only" | "execute"
+  use_gripper: false
+  open_gripper_before_approach: false
+  left_gripper_open_ratio: 0.0
+  left_gripper_close_ratio: 1.0
+  gripper_wait_s: 1.0
+  pregrasp_offset_grasp: [-0.08, 0.0, 0.0]
+  lift_offset_base: [0.0, 0.0, 0.10]
+  pregrasp_minimum_time: 3.0
+  grasp_minimum_time: 2.0
+  lift_minimum_time: 2.0
+  control_hold_time: 3.0
+  linear_velocity_limit: 0.2
+  angular_velocity_limit: 1.5
+  accel_limit_scaling: 0.5
+  stop_position_error: 0.01
+  stop_orientation_error: 0.05
+  frame_arrow_length_m: 0.08
+  world_frame: "world"
+  graspTee_left:            # grasp frame -> ee_left frame. 축이 다르면 이 값을 먼저 조정.
+    - [1.0, 0.0, 0.0, 0.0]
+    - [0.0, 1.0, 0.0, 0.0]
+    - [0.0, 0.0, 1.0, 0.0]
+    - [0.0, 0.0, 0.0, 1.0]

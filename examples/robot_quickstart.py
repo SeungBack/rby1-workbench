@@ -46,7 +46,8 @@ def _show_current_state(robot: RBY1) -> None:
     log.info("현재 관절 상태")
     for component in ("torso", "right_arm", "left_arm", "head"):
         q = robot.get_joint_positions(component)
-        log.info("  %-10s q_deg=%s", component, np.rad2deg(q).round(1).tolist())
+        log.info("  %-10s q_rad=%s q_deg=%s", component,q.round(3).tolist()
+                , np.rad2deg(q).round(1).tolist())
 
     t_right = robot.get_ee_pose("right_arm")
     t_left = robot.get_ee_pose("left_arm")

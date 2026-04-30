@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import logging
 import os
 import sys
@@ -12,6 +13,11 @@ import numpy as np
 import rerun as rr
 import torch
 
+from rby1_workbench import RBY1, load_rby1_config
+from rby1_workbench.control.grasp_execution import (
+    FoundGraspCandidate,
+    LeftArmGraspExecutor,
+)
 from rby1_workbench.perception.shm_stream import create_camera_stream
 
 log = logging.getLogger(__name__)
@@ -62,6 +68,136 @@ def _preprocess_color(
     return (t / 255.0 - mean) / std, t / 255.0
 
 
+@dataclass(slots=True)
+class _RuntimeState:
+    lock: threading.Lock
+    candidates: list[FoundGraspCandidate]
+    selected_index: int
+    status_msg: str
+
+
+def _grasp_to_transform(rotation: np.ndarray, translation: np.ndarray) -> np.ndarray:
+    T = np.eye(4, dtype=np.float64)
+    T[:3, :3] = np.asarray(rotation, dtype=np.float64).reshape(3, 3)
+    T[:3, 3] = np.asarray(translation, dtype=np.float64).reshape(3)
+    return T
+
+
+def _extract_candidates(gg) -> list[FoundGraspCandidate]:
+    scores = getattr(gg, "scores", None)
+    widths = getattr(gg, "widths", None)
+    heights = getattr(gg, "heights", None)
+    depths = getattr(gg, "depths", None)
+    fallback = getattr(gg, "grasp_group_array", None)
+
+    candidates: list[FoundGraspCandidate] = []
+    for index in range(len(gg)):
+        score = float(scores[index]) if scores is not None else float(fallback[index, 0])
+        width = float(widths[index]) if widths is not None else float(fallback[index, 1])
+        height = float(heights[index]) if heights is not None else float(fallback[index, 2])
+        depth = float(depths[index]) if depths is not None else float(fallback[index, 3])
+        candidates.append(
+            FoundGraspCandidate(
+                index=index,
+                score=score,
+                width_m=width,
+                height_m=height,
+                depth_m=depth,
+                camera_opticalTgrasp=_grasp_to_transform(
+                    gg.rotation_matrices[index],
+                    gg.translations[index],
+                ),
+            )
+        )
+    return candidates
+
+
+def _build_executor(cfg) -> LeftArmGraspExecutor | None:
+    mode = str(cfg.execution.mode).lower().strip()
+    if mode == "off":
+        return None
+
+    robot_cfg = load_rby1_config()
+    robot_cfg.address = cfg.robot.address
+    robot_cfg.model = cfg.robot.model
+    backend = str(cfg.robot.backend).lower().strip()
+    endpoint = None if cfg.robot.endpoint is None else str(cfg.robot.endpoint)
+    robot = RBY1(robot_cfg, backend=backend, endpoint=endpoint)
+    needs_motion = bool(cfg.robot.move_to_startup_pose) or mode == "execute"
+    if needs_motion:
+        robot.initialize()
+        if bool(cfg.robot.move_to_startup_pose):
+            _move_robot_to_startup_pose(robot, cfg.robot.startup_pose)
+    else:
+        robot.connect()
+    log.info("FoundGrasp execution robot ready (mode=%s, backend=%s)", mode, backend)
+    return LeftArmGraspExecutor(robot, cfg.execution)
+
+
+def _move_robot_to_startup_pose(robot: RBY1, startup_pose_cfg) -> None:
+    if hasattr(startup_pose_cfg, "keys"):
+        mode = str(startup_pose_cfg.mode).lower().strip()
+        minimum_time = float(startup_pose_cfg.minimum_time)
+    else:
+        mode = str(startup_pose_cfg).lower().strip()
+        minimum_time = 5.0
+
+    if mode == "ready":
+        ok = robot.ready(minimum_time=minimum_time)
+    elif mode == "zero":
+        ok = robot.zero(minimum_time=minimum_time)
+    elif mode == "joint":
+        kwargs = {"mode": "joint", "minimum_time": minimum_time}
+        for component in ("torso", "right_arm", "left_arm", "head"):
+            target = getattr(startup_pose_cfg, component, None)
+            if target is not None:
+                kwargs[component] = np.asarray(target, dtype=np.float64)
+        if len(kwargs) == 2:
+            raise ValueError("startup_pose.mode='joint' requires at least one component target")
+        ok = robot.move(**kwargs)
+    else:
+        raise ValueError(f"Unsupported robot.startup_pose.mode: {mode}")
+
+    if not ok:
+        raise RuntimeError(f"Failed to move robot to startup pose '{mode}'")
+    log.info("Robot moved to startup pose '%s' (minimum_time=%.2fs)", mode, minimum_time)
+
+
+def _run_candidate_action(
+    executor: LeftArmGraspExecutor,
+    candidate: FoundGraspCandidate,
+    state: _RuntimeState,
+) -> None:
+    try:
+        plan = executor.plan(candidate)
+        ok = executor.execute(plan)
+        with state.lock:
+            state.status_msg = (
+                f"candidate {candidate.index}: {'done' if ok else 'failed'} "
+                f"(mode={executor.mode}, score={candidate.score:.3f})"
+            )
+    except Exception as exc:
+        log.exception("Candidate action failed")
+        with state.lock:
+            state.status_msg = f"candidate {candidate.index}: error: {exc}"
+
+
+def _status_line(state: _RuntimeState, execution_mode: str) -> tuple[str, str]:
+    with state.lock:
+        count = len(state.candidates)
+        selected_index = min(state.selected_index, max(count - 1, 0))
+        state.selected_index = selected_index
+        if count == 0:
+            summary = f"mode={execution_mode} selected=0/0"
+        else:
+            candidate = state.candidates[selected_index]
+            summary = (
+                f"mode={execution_mode} score={candidate.score:.3f} "
+                f"selected={selected_index + 1}/{count}"
+            )
+        return summary, state.status_msg
+
+
 def _infer_and_log(
     model,
     model_cfg,
@@ -70,6 +206,7 @@ def _infer_and_log(
     K: np.ndarray,
     cfg,
     frame_idx: int,
+    state: _RuntimeState,
 ) -> None:
     _ensure_path(cfg.found_grasp.foundgrasp_root)
     from utils.visualization import log_to_rerun, visualize_and_save_opencv
@@ -123,6 +260,7 @@ def _infer_and_log(
     gg = gg.nms(translation_thresh=0.03, rotation_thresh=30.0 / 180.0 * np.pi)
     gg = gg.sort_by_score()[:50]
     log.info("frame %d: %d grasps", frame_idx, len(gg))
+    candidates = _extract_candidates(gg)
 
     vis_sample = {
         "og_color": og_color[0],
@@ -134,6 +272,17 @@ def _infer_and_log(
 
     vis_result = visualize_and_save_opencv(vis_sample, save_dir=None)
     log_to_rerun(vis_sample, vis_result, xyz_resized.reshape(-1, 3), gg, frame_idx)
+    with state.lock:
+        state.candidates = candidates
+        state.selected_index = min(state.selected_index, max(len(candidates) - 1, 0))
+        if candidates:
+            top = candidates[state.selected_index]
+            state.status_msg = (
+                f"frame {frame_idx}: {len(candidates)} grasps, "
+                f"selected={state.selected_index + 1} score={top.score:.3f}"
+            )
+        else:
+            state.status_msg = f"frame {frame_idx}: no grasps found"
 
 
 def run_found_grasp(cfg) -> None:
@@ -153,10 +302,29 @@ def run_found_grasp(cfg) -> None:
     cv2.namedWindow("FoundGrasp", cv2.WINDOW_NORMAL)
     cv2.resizeWindow("FoundGrasp", 1280, 720)
 
+    setup_error: str | None = None
+    try:
+        executor = _build_executor(cfg)
+        execution_mode = "off" if executor is None else executor.mode
+    except Exception as exc:
+        log.exception("FoundGrasp execution setup failed")
+        executor = None
+        execution_mode = "off"
+        setup_error = str(exc)
     frame_idx = 0
     infer_thread: threading.Thread | None = None
+    action_thread: threading.Thread | None = None
+    state = _RuntimeState(
+        lock=threading.Lock(),
+        candidates=[],
+        selected_index=0,
+        status_msg="g: infer",
+    )
+    if setup_error is not None:
+        with state.lock:
+            state.status_msg = f"execution setup error: {setup_error}"
 
-    log.info("g: run grasp inference  |  q: quit")
+    log.info("g: infer  |  [: prev grasp  ]: next grasp  |  e: preview/execute  |  q: quit")
     try:
         while True:
             frame = cam.get_frame()
@@ -166,26 +334,84 @@ def run_found_grasp(cfg) -> None:
                 break
 
             display = cv2.cvtColor(frame.color_rgb, cv2.COLOR_RGB2BGR)
-            busy = infer_thread is not None and infer_thread.is_alive()
+            infer_busy = infer_thread is not None and infer_thread.is_alive()
+            action_busy = action_thread is not None and action_thread.is_alive()
+            busy = infer_busy or action_busy
+            summary, status_msg = _status_line(state, execution_mode)
             cv2.putText(
                 display,
-                "inferring..." if busy else "g: grasp  q: quit",
+                "busy..." if busy else "g: infer  [ ]: select  e: act  q: quit",
                 (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2,
+            )
+            cv2.putText(
+                display,
+                summary,
+                (10, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 220, 120), 2,
+            )
+            cv2.putText(
+                display,
+                status_msg,
+                (10, 95), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (120, 220, 255), 2,
             )
             cv2.imshow("FoundGrasp", display)
 
             key = cv2.waitKey(1) & 0xFF
             if key == ord("q"):
                 break
+            if key == ord("[") and not busy:
+                with state.lock:
+                    if state.candidates:
+                        state.selected_index = (state.selected_index - 1) % len(state.candidates)
+                        candidate = state.candidates[state.selected_index]
+                        state.status_msg = (
+                            f"selected grasp {state.selected_index + 1}/{len(state.candidates)} "
+                            f"score={candidate.score:.3f}"
+                        )
+                continue
+            if key == ord("]") and not busy:
+                with state.lock:
+                    if state.candidates:
+                        state.selected_index = (state.selected_index + 1) % len(state.candidates)
+                        candidate = state.candidates[state.selected_index]
+                        state.status_msg = (
+                            f"selected grasp {state.selected_index + 1}/{len(state.candidates)} "
+                            f"score={candidate.score:.3f}"
+                        )
+                continue
             if key == ord("g") and not busy:
                 depth_m = frame.depth.astype(np.float32) * depth_scale
                 infer_thread = threading.Thread(
                     target=_infer_and_log,
-                    args=(model, model_cfg, frame.color_rgb, depth_m, K, cfg, frame_idx),
+                    args=(model, model_cfg, frame.color_rgb, depth_m, K, cfg, frame_idx, state),
                     daemon=True,
                 )
                 infer_thread.start()
                 frame_idx += 1
+                with state.lock:
+                    state.status_msg = f"frame {frame_idx - 1}: inferring..."
+                continue
+            if key == ord("e") and not busy:
+                if executor is None:
+                    with state.lock:
+                        state.status_msg = "execution.mode=off"
+                    continue
+                with state.lock:
+                    if not state.candidates:
+                        state.status_msg = "no grasp candidates"
+                        continue
+                    candidate = state.candidates[state.selected_index]
+                    state.status_msg = (
+                        f"candidate {candidate.index}: action start "
+                        f"(mode={executor.mode}, score={candidate.score:.3f})"
+                    )
+                action_thread = threading.Thread(
+                    target=_run_candidate_action,
+                    args=(executor, candidate, state),
+                    daemon=True,
+                )
+                action_thread.start()
     finally:
+        if executor is not None:
+            executor.shutdown()
         cam.stop()
         cv2.destroyAllWindows()

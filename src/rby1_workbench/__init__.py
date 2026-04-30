@@ -24,6 +24,11 @@ from rby1_workbench.control.joint_commands import (
     JointCommandSettings,
     JointGroupSpec,
 )
+from rby1_workbench.control.grasp_execution import (
+    FoundGraspCandidate,
+    LeftArmGraspExecutor,
+    LeftArmGraspPlan,
+)
 from rby1_workbench.control.presets import ready_pose_targets_for_model
 from rby1_workbench.calibration import (
     BoardConsistency,
@@ -72,6 +77,9 @@ __all__ = [
     "JointCommandClient",
     "JointCommandSettings",
     "JointGroupSpec",
+    "FoundGraspCandidate",
+    "LeftArmGraspExecutor",
+    "LeftArmGraspPlan",
     "ready_pose_targets_for_model",
     # Robot state
     "RobotStateBuffer",

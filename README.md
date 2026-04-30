@@ -161,6 +161,35 @@ python -m rby1_workbench.apps.sam3 \
   realsense.color_height=480
 ```
 
+FoundGrasp 실행:
+
+```bash
+rby1-found-grasp
+```
+
+기본 설정에서는 시작 시 로봇을 지정된 joint startup 자세로 한 번 이동한다.
+원하지 않으면 `robot.move_to_startup_pose=false` 로 끌 수 있다.
+기본값은 `robot.startup_pose.mode=joint` 이고,
+`robot.startup_pose.torso`, `right_arm`, `left_arm`, `head`는 모두 radian 단위다.
+
+기본 `execution.mode=viz_only` 에서는 추론된 grasp를 실제로 움직이지 않고,
+`camera_optical`, grasp frame, `ee_left` pregrasp/target/lift 좌표계를 Rerun에만 출력한다.
+
+기본 조작:
+- `g`: grasp 추론
+- `[` / `]`: 후보 grasp 선택
+- `e`: 현재 선택 grasp에 대해 preview 또는 execute
+- `q`: 종료
+
+실제 로봇 실행은 명시적으로 켜야 한다:
+
+```bash
+rby1-found-grasp execution.mode=execute execution.use_gripper=true
+```
+
+축이 맞지 않으면 `src/rby1_workbench/conf/found_grasp.yaml` 의
+`execution.graspTee_left` 를 먼저 조정하면 된다.
+
 console script로 기본 viewer 실행:
 
 ```bash
