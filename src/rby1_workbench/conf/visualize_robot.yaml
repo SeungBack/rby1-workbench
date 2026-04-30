@@ -16,7 +16,13 @@ calib:
   output_dir: "outputs"
   auto_load: true
 
-realsense:
+camera_source:
+  mode: "server"              # "server" | "direct"
+  name: "head"
+  address: "tcp://127.0.0.1:5550"
+  prefix: "rby1"
+
+realsense:                    # mode: "direct" 시 카메라 설정 / pointcloud 파라미터는 항상 참조
   serial_number: null
   color_width: 1280
   color_height: 720

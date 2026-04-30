@@ -10,7 +10,8 @@ import numpy as np
 import rerun as rr
 
 from omegaconf import DictConfig, OmegaConf
-from rby1_workbench.perception.realsense import RealSenseFrame, RealSenseStream
+from rby1_workbench.perception.realsense import RealSenseFrame
+from rby1_workbench.perception.shm_stream import create_camera_stream
 from rby1_workbench.robot.client import RobotStateBuffer, connect_robot
 from rby1_workbench.robot.kinematics import RobotKinematics
 from rby1_workbench.viz.mesh_assets import default_link_mesh_map, discover_default_mesh_dir
@@ -85,17 +86,17 @@ def run_visualize_robot(cfg: DictConfig) -> None:
         else:
             logging.info("Calibration auto-load: no file found in '%s'.", calib_cfg.output_dir)
 
-    cam: RealSenseStream | None = None
+    cam = None
     cam_K: np.ndarray | None = None
     rs_cfg = getattr(cfg, "realsense", None)
-    if rs_cfg is not None:
+    if getattr(cfg, "camera_source", None) is not None:
         try:
-            cam = RealSenseStream(rs_cfg)
+            cam = create_camera_stream(cfg)
             cam.start()
             cam_K, _ = cam.get_intrinsics()
-            logging.info("RealSense started (depth scale: %.6f m/count)", cam.depth_scale)
+            logging.info("Camera started (depth_scale: %.6f m/count)", cam.depth_scale)
         except Exception as e:
-            logging.warning("RealSense init failed, point cloud disabled: %s", e)
+            logging.warning("Camera init failed, point cloud disabled: %s", e)
             cam = None
 
     rerun_session.init()

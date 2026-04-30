@@ -1,15 +1,21 @@
-"""RBY1 실시간 제어 스트림.
+"""RBY1 continuous control stream helpers.
 
-VR teleop main.py의 제어 루프를 일반화한 wrapper.
-매 tick에 send()를 호출하면 모든 컴포넌트를 하나의 SDK command로 묶어 전송.
-None인 컴포넌트는 마지막으로 보낸 값으로 자동 hold.
+Public API:
+
+```python
+stream = robot.open_stream(mode="cartesian")
+stream.send(torso=q_torso, right_arm=T_right, left_arm=T_left, head=q_head)
+stream.pause()
+stream.resume()
+stream.close()
+```
 """
 
 from __future__ import annotations
 
 import logging
 import threading
-from typing import Any
+from typing import Any, Callable, Mapping, Protocol
 
 import numpy as np
 import rby1_sdk as rby
@@ -17,294 +23,403 @@ from omegaconf import DictConfig
 
 log = logging.getLogger(__name__)
 
+_COMPONENT_ORDER = ("torso", "right_arm", "left_arm", "head")
+_ARM_COMPONENTS = frozenset({"right_arm", "left_arm"})
 
-class RBY1Stream:
-    """실시간 whole-body 제어 스트림.
 
-    사용 예::
+def normalize_stream_mode(mode: str | Mapping[str, str] | None) -> dict[str, str]:
+    """Return per-component stream modes.
 
-        stream = robot.create_stream()
-
-        # 첫 send는 reset=True 자동 적용 (CartesianImpedance 시작 시 튐 방지)
-        stream.send(
-            torso=q_torso,
-            right_arm=T_right,
-            left_arm=T_left,
-            head=np.array([yaw, pitch]),
-        )
-
-        # 이후: 바뀐 것만 — 나머지는 마지막 값으로 자동 hold
-        stream.send(right_arm=T_right_new)
-
-        # blocking command 전후 일시정지 / 재개
-        stream.pause()
-        robot.movej(...)          # SDK 스트림과 충돌 없이 실행됨
-        stream.resume()           # 다음 send부터 reset=True 자동 재적용
-
-        stream.cancel()
-
-    context manager::
-
-        with robot.create_stream() as stream:
-            stream.send(...)
+    Supported public values:
+    - `"joint"`: every component is interpreted as a joint target
+    - `"cartesian"`: `torso`/`head` stay joint, arms use Cartesian targets
+    - mapping: component -> `"joint"` or `"cartesian"`
     """
+    if mode is None:
+        return {
+            "torso": "joint",
+            "right_arm": "cartesian",
+            "left_arm": "cartesian",
+            "head": "joint",
+        }
 
-    def __init__(self, sdk_robot: Any, cfg: DictConfig):
+    if isinstance(mode, str):
+        key = mode.lower().strip()
+        if key == "joint":
+            return {component: "joint" for component in _COMPONENT_ORDER}
+        if key == "cartesian":
+            return {
+                "torso": "joint",
+                "right_arm": "cartesian",
+                "left_arm": "cartesian",
+                "head": "joint",
+            }
+        raise ValueError(f"Unsupported stream mode: {mode}")
+
+    normalized = {component: "joint" for component in _COMPONENT_ORDER}
+    for component, value in mode.items():
+        if component not in normalized:
+            raise ValueError(f"Unknown stream component: {component}")
+        component_mode = str(value).lower().strip()
+        if component_mode not in {"joint", "cartesian"}:
+            raise ValueError(
+                f"Unsupported stream mode for {component}: {value}"
+            )
+        if component not in _ARM_COMPONENTS and component_mode == "cartesian":
+            raise ValueError(
+                f"Cartesian stream mode is only supported for arms, got {component}"
+            )
+        normalized[component] = component_mode
+    return normalized
+
+
+class _RemoteRequester(Protocol):
+    def request(self, method: str, **params: Any) -> dict[str, Any]:
+        ...
+
+
+class _DirectStreamSession:
+    """Direct SDK-backed streaming session."""
+
+    def __init__(
+        self,
+        sdk_robot: Any,
+        cfg: DictConfig,
+        mode: dict[str, str],
+        *,
+        on_close: Callable[[], None] | None = None,
+    ) -> None:
         self._robot = sdk_robot
         self._cfg = cfg
+        self._mode = mode
         self._stream = sdk_robot.create_command_stream()
         self._last: dict[str, Any] = {}
         self._paused = False
-        self._cancelled = False
-        self._first_send = True   # True → 다음 send에서 reset=True 자동 적용
+        self._closed = False
+        self._first_send = True
         self._lock = threading.Lock()
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
+        self._on_close = on_close
 
     def send(
         self,
+        *,
         torso: np.ndarray | None = None,
         right_arm: np.ndarray | None = None,
         left_arm: np.ndarray | None = None,
         head: np.ndarray | tuple[float, float] | None = None,
         reset: bool | None = None,
     ) -> None:
-        """전체 컴포넌트를 하나의 command로 묶어 스트림 전송.
-
-        Args:
-            torso: 관절 위치 배열 또는 4×4 SE3 (torso_mode 설정에 따라).
-            right_arm: 4×4 SE3 또는 관절 위치 배열.
-            left_arm: 동상.
-            head: [yaw_rad, pitch_rad] — ndarray 또는 (yaw, pitch) 튜플.
-            reset: CartesianImpedance reset_reference 플래그.
-                   None(기본)이면 스트림 시작/재개 후 첫 번째 send에서만 True 자동 적용.
-        """
         with self._lock:
-            if self._paused or self._cancelled:
+            if self._paused or self._closed:
                 return
 
-            _reset = self._first_send if reset is None else reset
+            effective_reset = self._first_send if reset is None else reset
 
-            # None이면 last로 채움
-            torso     = torso     if torso     is not None else self._last.get("torso")
+            torso = torso if torso is not None else self._last.get("torso")
             right_arm = right_arm if right_arm is not None else self._last.get("right_arm")
-            left_arm  = left_arm  if left_arm  is not None else self._last.get("left_arm")
-            head      = head      if head      is not None else self._last.get("head")
+            left_arm = left_arm if left_arm is not None else self._last.get("left_arm")
+            head = head if head is not None else self._last.get("head")
 
-            cmd = self._build(torso, right_arm, left_arm, head, _reset)
-            if cmd is None:
+            command = self._build(
+                torso=torso,
+                right_arm=right_arm,
+                left_arm=left_arm,
+                head=head,
+                reset=effective_reset,
+            )
+            if command is None:
                 return
 
             try:
-                self._stream.send_command(cmd)
-            except RuntimeError as e:
-                if "expired" in str(e).lower():
-                    log.warning("Command stream expired; cancelling stream")
-                    self._cancelled = True
+                self._stream.send_command(command)
+            except RuntimeError as exc:
+                if "expired" in str(exc).lower():
+                    log.warning("Command stream expired; closing stream")
+                    self._closed = True
+                    self._notify_closed()
                     return
                 raise
-            self._first_send = False
 
-            # last 업데이트
+            self._first_send = False
             if torso is not None:
-                self._last["torso"] = torso
+                self._last["torso"] = np.asarray(torso, dtype=float).copy()
             if right_arm is not None:
-                self._last["right_arm"] = right_arm
+                self._last["right_arm"] = np.asarray(right_arm, dtype=float).copy()
             if left_arm is not None:
-                self._last["left_arm"] = left_arm
+                self._last["left_arm"] = np.asarray(left_arm, dtype=float).copy()
             if head is not None:
-                self._last["head"] = head
+                self._last["head"] = np.asarray(head, dtype=float).copy()
 
     def pause(self) -> None:
-        """스트림 전송 일시정지.
-
-        진행 중인 send()가 완료될 때까지 대기한 후 중단.
-        이미 paused 상태라면 no-op.
-        """
         with self._lock:
             self._paused = True
 
     def resume(self) -> None:
-        """스트림 전송 재개.
-
-        다음 send()부터 실제로 전송되며, reset=True가 자동 적용됨.
-        이를 통해 blocking command 후 포즈가 달라진 상태에서도
-        CartesianImpedance가 튀지 않고 부드럽게 재개됨.
-        """
         with self._lock:
             self._paused = False
-            self._first_send = True   # 재개 후 첫 send에서 reset_reference
+            self._first_send = True
 
     @property
     def paused(self) -> bool:
-        """현재 일시정지 상태 여부."""
         return self._paused
 
     @property
-    def cancelled(self) -> bool:
-        """스트림이 취소된 상태 여부."""
-        return self._cancelled
+    def closed(self) -> bool:
+        return self._closed
 
-    def cancel(self) -> None:
-        """스트림 취소. 이미 취소된 상태면 no-op."""
+    def close(self) -> None:
         with self._lock:
-            if self._cancelled:
+            if self._closed:
                 return
-            self._cancelled = True
+            self._closed = True
         try:
             self._stream.cancel()
         except Exception:
             pass
+        self._notify_closed()
 
-    # ------------------------------------------------------------------
-    # Context manager
-    # ------------------------------------------------------------------
-
-    def __enter__(self) -> "RBY1Stream":
-        return self
-
-    def __exit__(self, *_: Any) -> None:
-        self.cancel()
-
-    # ------------------------------------------------------------------
-    # Internal: command builder
-    # ------------------------------------------------------------------
+    def _notify_closed(self) -> None:
+        if self._on_close is not None:
+            self._on_close()
+            self._on_close = None
 
     def _build(
         self,
+        *,
         torso: Any,
         right_arm: Any,
         left_arm: Any,
         head: Any,
         reset: bool,
     ) -> Any | None:
-        cfg = self._cfg
-        dt = cfg.stream.dt
+        dt = float(self._cfg.stream.dt)
         hold_time = dt * 10.0
         min_time = dt * 1.01
 
-        has_body = any(v is not None for v in (torso, right_arm, left_arm))
+        has_body = any(value is not None for value in (torso, right_arm, left_arm))
         has_head = head is not None
         if not has_body and not has_head:
             return None
 
-        cbc = rby.ComponentBasedCommandBuilder()
-
-        # ---- head (항상 JointPosition) ----
+        component_builder = rby.ComponentBasedCommandBuilder()
         if has_head:
-            h = np.asarray(head, dtype=float)
-            cbc.set_head_command(
+            q_head = np.asarray(head, dtype=float)
+            component_builder.set_head_command(
                 rby.JointPositionCommandBuilder()
-                .set_command_header(rby.CommandHeaderBuilder().set_control_hold_time(hold_time))
-                .set_position([float(h[0]), float(h[1])])
+                .set_command_header(
+                    rby.CommandHeaderBuilder().set_control_hold_time(hold_time)
+                )
+                .set_position([float(q_head[0]), float(q_head[1])])
                 .set_minimum_time(min_time)
             )
 
         if not has_body:
-            return rby.RobotCommandBuilder().set_command(cbc)
+            return rby.RobotCommandBuilder().set_command(component_builder)
 
-        # ---- body ----
-        body = rby.BodyComponentBasedCommandBuilder()
-
+        body_builder = rby.BodyComponentBasedCommandBuilder()
         if torso is not None:
-            body.set_torso_command(
-                self._build_torso(torso, hold_time, min_time, reset)
+            body_builder.set_torso_command(
+                rby.JointPositionCommandBuilder()
+                .set_command_header(
+                    rby.CommandHeaderBuilder().set_control_hold_time(hold_time)
+                )
+                .set_position(np.asarray(torso, dtype=float).tolist())
+                .set_minimum_time(min_time)
             )
 
-        for component, T_or_q in (("right_arm", right_arm), ("left_arm", left_arm)):
-            if T_or_q is None:
+        for component, target in (("right_arm", right_arm), ("left_arm", left_arm)):
+            if target is None:
                 continue
-            mode = getattr(cfg.stream, f"{component}_mode")
-            builder = self._build_arm(component, T_or_q, mode, hold_time, min_time, reset)
-            getattr(body, f"set_{component}_command")(builder)
+            if self._mode[component] == "joint":
+                builder = (
+                    rby.JointPositionCommandBuilder()
+                    .set_command_header(
+                        rby.CommandHeaderBuilder().set_control_hold_time(hold_time)
+                    )
+                    .set_position(np.asarray(target, dtype=float).tolist())
+                    .set_minimum_time(min_time)
+                )
+            else:
+                ci = self._cfg.cartesian_impedance
+                frame = "ee_right" if component == "right_arm" else "ee_left"
+                builder = (
+                    rby.CartesianImpedanceControlCommandBuilder()
+                    .set_command_header(
+                        rby.CommandHeaderBuilder().set_control_hold_time(hold_time)
+                    )
+                    .set_minimum_time(min_time)
+                    .set_joint_stiffness(list(ci.arm_stiffness))
+                    .set_joint_torque_limit(list(ci.arm_torque_limit))
+                    .set_stop_joint_position_tracking_error(0)
+                    .set_stop_orientation_tracking_error(0)
+                    .set_reset_reference(reset)
+                )
+                for joint_name, (lower, upper) in ci.joint_limits.items():
+                    if joint_name.startswith(component):
+                        builder.add_joint_limit(joint_name, lower, upper)
+                builder.add_target(
+                    "base",
+                    frame,
+                    np.asarray(target, dtype=float),
+                    ci.arm_linear_velocity_limit,
+                    ci.arm_angular_velocity_limit,
+                    ci.arm_linear_accel_limit,
+                    ci.arm_angular_accel_limit,
+                )
+            getattr(body_builder, f"set_{component}_command")(builder)
 
-        cbc.set_body_command(body)
-        return rby.RobotCommandBuilder().set_command(cbc)
+        component_builder.set_body_command(body_builder)
+        return rby.RobotCommandBuilder().set_command(component_builder)
 
-    def _build_torso(
-        self, q_or_T: Any, hold_time: float, min_time: float, reset: bool
-    ) -> Any:
-        mode = self._cfg.stream.torso_mode
-        ci = self._cfg.cartesian_impedance
-        header = rby.CommandHeaderBuilder().set_control_hold_time(hold_time)
 
-        if mode == "joint_position":
-            return (
-                rby.JointPositionCommandBuilder()
-                .set_command_header(header)
-                .set_position(np.asarray(q_or_T, dtype=float).tolist())
-                .set_minimum_time(min_time)
-            )
+class _RemoteStreamSession:
+    """RPC-backed streaming session."""
 
-        # cartesian_impedance (VR teleop torso 방식)
-        T = np.asarray(q_or_T, dtype=float)
-        builder = (
-            rby.CartesianImpedanceControlCommandBuilder()
-            .set_command_header(header)
-            .set_minimum_time(min_time)
-            .set_joint_stiffness(list(ci.torso_stiffness))
-            .set_joint_torque_limit(list(ci.torso_torque_limit))
-            .set_stop_joint_position_tracking_error(0)
-            .set_stop_orientation_tracking_error(0)
-            .set_reset_reference(reset)
-        )
-        for jname, (lo, hi) in ci.joint_limits.items():
-            if jname.startswith("torso"):
-                builder.add_joint_limit(jname, lo, hi)
-        builder.add_target(
-            "base", "link_torso_5", T,
-            ci.torso_linear_velocity_limit,
-            ci.torso_angular_velocity_limit,
-            ci.torso_linear_accel_limit,
-            ci.torso_angular_accel_limit,
-        )
-        return builder
+    def __init__(self, requester: _RemoteRequester, stream_id: str) -> None:
+        self._requester = requester
+        self._stream_id = stream_id
+        self._paused = False
+        self._closed = False
 
-    def _build_arm(
+    def send(
         self,
-        component: str,
-        T_or_q: Any,
-        mode: str,
-        hold_time: float,
-        min_time: float,
-        reset: bool,
-    ) -> Any:
-        ci = self._cfg.cartesian_impedance
-        header = rby.CommandHeaderBuilder().set_control_hold_time(hold_time)
-        frame = "link_right_arm_6" if component == "right_arm" else "link_left_arm_6"
+        *,
+        torso: np.ndarray | None = None,
+        right_arm: np.ndarray | None = None,
+        left_arm: np.ndarray | None = None,
+        head: np.ndarray | tuple[float, float] | None = None,
+        reset: bool | None = None,
+    ) -> None:
+        if self._paused or self._closed:
+            return
+        self._requester.request(
+            "stream_send",
+            stream_id=self._stream_id,
+            torso=_encode_array(torso),
+            right_arm=_encode_array(right_arm),
+            left_arm=_encode_array(left_arm),
+            head=_encode_array(head),
+            reset=reset,
+        )
 
-        if mode == "joint_position":
-            return (
-                rby.JointPositionCommandBuilder()
-                .set_command_header(header)
-                .set_position(np.asarray(T_or_q, dtype=float).tolist())
-                .set_minimum_time(min_time)
-            )
+    def pause(self) -> None:
+        if self._closed:
+            return
+        self._requester.request("stream_pause", stream_id=self._stream_id)
+        self._paused = True
 
-        if mode == "cartesian_impedance":
-            T = np.asarray(T_or_q, dtype=float)
-            builder = (
-                rby.CartesianImpedanceControlCommandBuilder()
-                .set_command_header(header)
-                .set_minimum_time(min_time)
-                .set_joint_stiffness(list(ci.arm_stiffness))
-                .set_joint_torque_limit(list(ci.arm_torque_limit))
-                .set_stop_joint_position_tracking_error(0)
-                .set_stop_orientation_tracking_error(0)
-                .set_reset_reference(reset)
-            )
-            for jname, (lo, hi) in ci.joint_limits.items():
-                if jname.startswith(component):
-                    builder.add_joint_limit(jname, lo, hi)
-            builder.add_target(
-                "base", frame, T,
-                ci.arm_linear_velocity_limit,
-                ci.arm_angular_velocity_limit,
-                ci.arm_linear_accel_limit,
-                ci.arm_angular_accel_limit,
-            )
-            return builder
+    def resume(self) -> None:
+        if self._closed:
+            return
+        self._requester.request("stream_resume", stream_id=self._stream_id)
+        self._paused = False
 
-        raise ValueError(f"Unknown arm mode: '{mode}'")
+    @property
+    def paused(self) -> bool:
+        return self._paused
+
+    @property
+    def closed(self) -> bool:
+        return self._closed
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        self._requester.request("stream_close", stream_id=self._stream_id)
+        self._closed = True
+
+
+class RBY1Stream:
+    """User-facing continuous control stream.
+
+    `send(...)` accepts per-component targets.  Unless otherwise documented by
+    the stream mode, target arrays are interpreted as follows:
+
+    - `torso=q_torso`:
+      joint target in radians, shape `(len(model.torso_idx),)`
+    - `right_arm=q_right` or `right_arm=T_right`:
+      joint target in radians for joint mode, or 4x4 `base -> ee_right`
+      transform for Cartesian mode
+    - `left_arm=q_left` or `left_arm=T_left`:
+      joint target in radians for joint mode, or 4x4 `base -> ee_left`
+      transform for Cartesian mode
+    - `head=q_head`:
+      joint target `[head_0, head_1]` in radians, shape `(2,)`
+
+    Joint order always follows the model indices exposed by RB-Y1 SDK:
+    `model.torso_idx`, `model.right_arm_idx`, `model.left_arm_idx`,
+    `model.head_idx`.
+    """
+
+    def __init__(self, session: _DirectStreamSession | _RemoteStreamSession):
+        self._session = session
+
+    def send(
+        self,
+        *,
+        torso: np.ndarray | None = None,
+        right_arm: np.ndarray | None = None,
+        left_arm: np.ndarray | None = None,
+        head: np.ndarray | tuple[float, float] | None = None,
+        reset: bool | None = None,
+    ) -> None:
+        self._session.send(
+            torso=torso,
+            right_arm=right_arm,
+            left_arm=left_arm,
+            head=head,
+            reset=reset,
+        )
+
+    def pause(self) -> None:
+        self._session.pause()
+
+    def resume(self) -> None:
+        self._session.resume()
+
+    @property
+    def paused(self) -> bool:
+        return self._session.paused
+
+    @property
+    def closed(self) -> bool:
+        return self._session.closed
+
+    def close(self) -> None:
+        self._session.close()
+
+    def __enter__(self) -> "RBY1Stream":
+        return self
+
+    def __exit__(self, *_: Any) -> None:
+        self.close()
+
+
+def make_direct_stream(
+    sdk_robot: Any,
+    cfg: DictConfig,
+    mode: str | Mapping[str, str] | None,
+    *,
+    on_close: Callable[[], None] | None = None,
+) -> RBY1Stream:
+    return RBY1Stream(
+        _DirectStreamSession(
+            sdk_robot=sdk_robot,
+            cfg=cfg,
+            mode=normalize_stream_mode(mode),
+            on_close=on_close,
+        )
+    )
+
+
+def make_remote_stream(
+    requester: _RemoteRequester,
+    stream_id: str,
+) -> RBY1Stream:
+    return RBY1Stream(_RemoteStreamSession(requester, stream_id))
+
+
+def _encode_array(value: Any) -> Any:
+    if value is None:
+        return None
+    return np.asarray(value, dtype=float).tolist()

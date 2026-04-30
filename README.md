@@ -32,9 +32,24 @@ RB-Y1용 시각화, 좌표계 추적, calibration, control 앱을 한 곳에 모
 - repository name: `rby1-workbench`
 - package metadata name: `rby1-workbench`
 - Python import name: `rby1_workbench`
-- console script: `rby1-realtime-sam3-realsense`
-- console script: `rby1-visualize-robot`
-- console script: `rby1-viser-joint-control`
+
+**apps vs examples 구분:**
+
+| | `apps/` | `examples/` |
+|---|---|---|
+| 역할 | 로봇 운용 도구 | 라이브러리 사용 레퍼런스 |
+| console script | 있음 (`rby1-*`) | 없음 |
+| 실행 방법 | `rby1-xxx` 또는 `python -m rby1_workbench.apps.xxx` | `python examples/xxx.py` |
+
+**Console scripts:**
+
+| 명령 | 설명 |
+|---|---|
+| `rby1-camera-server` | RealSense 카메라 서버 |
+| `rby1-head-camera-calib` | head 카메라 hand-eye 캘리브레이션 |
+| `rby1-visualize-robot` | 로봇 FK + Rerun 시각화 |
+| `rby1-viser-joint-control` | Viser 기반 joint control panel |
+| `rby1-sam3` | RealSense + SAM3 실시간 segmentation |
 
 ## Install
 
@@ -51,6 +66,76 @@ pip install .
 ```
 
 ## Run
+
+### Camera Server
+
+여러 앱이 동시에 RealSense를 사용할 때는 카메라 서버를 먼저 실행한다.
+서버가 카메라를 단독으로 점유하고, 각 앱은 Shared Memory로 프레임을 읽는다.
+
+```bash
+rby1-camera-server
+# 또는
+python -m rby1_workbench.apps.camera_server
+```
+
+설정 파일: `src/rby1_workbench/conf/camera_server.yaml`
+
+```yaml
+cameras:
+  - name: "head"          # 앱에서 이 이름으로 접근
+    serial_number: null   # null = 첫 번째 연결된 카메라
+    color_width: 1280
+    color_height: 720
+    fps: 30
+    enable_depth: true
+```
+
+카메라 추가 시 `cameras` 리스트에 블록을 추가하고 `serial_number`로 구분한다.
+
+**모드 전환** (`camera_source.mode`):
+
+| 값 | 동작 |
+|---|---|
+| `"server"` | 카메라 서버에서 Shared Memory로 읽음 (기본값) |
+| `"direct"` | 앱이 직접 RealSense를 열음 (서버 없이 단독 실행 시) |
+
+---
+
+### Head Camera Calibration
+
+head 카메라 hand-eye 캘리브레이션 (eye-in-hand, ChArUco board).
+캘리브레이션 결과는 `outputs/` 에 저장되고 visualize_robot 실행 시 자동 로드된다.
+
+**사전 조건:** 카메라 서버 실행, 로봇 연결
+
+```bash
+rby1-head-camera-calib
+# 또는
+python -m rby1_workbench.apps.head_camera_calib
+```
+
+설정 파일 오버라이드:
+
+```bash
+rby1-head-camera-calib --config my_calib.yaml --robot-config my_rby1.yaml
+```
+
+**OpenCV 창 단축키:**
+
+| 키 | 동작 |
+|---|---|
+| `s` | 현재 프레임 샘플 저장 (board 감지 시) |
+| `m` | 토르소를 랜덤 자세로 이동 |
+| `c` | 전체 방법 계산 후 최적 결과 저장 |
+| `d` | 모든 샘플 삭제 |
+| `q` | 종료 |
+
+`c` 키를 누르면 5가지 방법(TSAI, PARK, HORAUD, ANDREFF, DANIILIDIS) 결과를
+board consistency 기준으로 비교하고 가장 낮은 방법을 자동 저장한다.
+
+설정 파일: `src/rby1_workbench/conf/head_camera_calib.yaml`
+
+---
 
 RealSense 컬러/깊이 스트림 위에 SAM3 prompt segmentation 실행:
 
@@ -213,12 +298,27 @@ OpenCV 창에서 사용할 기본 조작:
 
 ```text
 src/rby1_workbench/
-  apps/       # 실행 앱
-  conf/       # Hydra config
-  config/     # structured config
-  perception/ # RealSense / SAM3 / OpenCV prompt wrappers
-  control/    # joint command / control panel helpers
-  geometry/   # SE3 / transform graph
-  robot/      # robot state / joints / FK
-  viz/        # rerun logging / scene
+  apps/                      # console script 등록된 실행 도구
+    camera_server.py         #   rby1-camera-server
+    head_camera_calib.py     #   rby1-head-camera-calib
+    visualize_robot.py       #   rby1-visualize-robot
+    viser_joint_control_panel.py  # rby1-viser-joint-control
+    realtime_sam3_realsense.py    # rby1-realtime-sam3
+  conf/                      # 패키지 기본 설정 (pip install 후에도 유효)
+    camera_server.yaml
+    head_camera_calib.yaml
+    visualize_robot.yaml
+    rby1.yaml
+  perception/
+    realsense.py             # RealSenseStream (직접 접근)
+    shm_stream.py            # SharedMemoryCameraStream (서버 클라이언트)
+  calibration/               # ChArUco detector, hand-eye solver
+  geometry/                  # SE3 / transform graph
+  robot/                     # robot state / joints / FK / kinematics
+  viz/                       # Rerun logging / mesh assets
+
+examples/                    # 라이브러리 사용 레퍼런스 (console script 없음)
+  check_robot_status.py
+  keyboard_control.py
+  robot_control_basic.py
 ```

@@ -1,0 +1,33 @@
+# Camera server config
+# 카메라 이름은 이 파일에서만 정의. 코드에서는 name만 사용.
+#
+# Usage:
+#   python -m rby1_workbench.perception.camera_server
+#   python -m rby1_workbench.perception.camera_server --config my_server.yaml
+
+cameras:
+  - name: "head"
+    serial_number: null       # null = 첫 번째 연결된 카메라 자동 선택
+    color_width: 1280
+    color_height: 720
+    depth_width: 1280
+    depth_height: 720
+    fps: 30
+    enable_depth: true
+    align_depth_to_color: true
+    warmup_frames: 5
+
+  # 카메라 추가 시 아래 블록을 복사해서 추가
+  # - name: "wrist_right"
+  #   serial_number: "XXXXXXXXX"
+  #   color_width: 1280
+  #   color_height: 720
+  #   depth_width: 1280
+  #   depth_height: 720
+  #   fps: 30
+  #   enable_depth: true
+  #   align_depth_to_color: true
+  #   warmup_frames: 5
+
+shm_prefix: "rby1"
+zmq_pub_address: "tcp://127.0.0.1:5550"

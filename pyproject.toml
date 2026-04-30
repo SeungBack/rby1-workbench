@@ -20,9 +20,11 @@ dependencies = [
 ]
 
 [project.scripts]
-rby1-realtime-sam3-realsense = "rby1_workbench.apps.realtime_sam3_realsense:cli"
-rby1-visualize-robot = "rby1_workbench.apps.visualize_robot:cli"
-rby1-viser-joint-control = "rby1_workbench.apps.viser_joint_control_panel:cli"
+rby1-camera-server        = "rby1_workbench.apps.camera_server:cli"
+rby1-head-camera-calib    = "rby1_workbench.apps.head_camera_calib:cli"
+rby1-visualize-robot      = "rby1_workbench.apps.visualize_robot:cli"
+rby1-viser-joint-control  = "rby1_workbench.apps.viser_joint_control_panel:cli"
+rby1-sam3                 = "rby1_workbench.apps.realtime_sam3_realsense:cli"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

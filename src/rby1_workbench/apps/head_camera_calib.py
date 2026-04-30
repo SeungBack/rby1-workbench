@@ -28,7 +28,7 @@ import numpy as np
 from rby1_workbench import RBY1, load_rby1_config
 from rby1_workbench.calibration import CharucoDetector, HandEyeSolver, camera_opticalTforward
 from rby1_workbench.config.schema import load_calib_config
-from rby1_workbench.perception.realsense import RealSenseStream
+from rby1_workbench.perception.shm_stream import create_camera_stream
 
 log = logging.getLogger(__name__)
 
@@ -115,7 +115,7 @@ def main() -> None:
     
 
     # ── Camera ───────────────────────────────────────────────────────────
-    cam = RealSenseStream(calib_cfg.realsense)
+    cam = create_camera_stream(calib_cfg)
     cam.start()
     K, D = cam.get_intrinsics()
     log.info("Camera intrinsics\nK:\n%s\nD: %s", K, D)
@@ -242,6 +242,8 @@ def main() -> None:
         cam.stop()
         cv2.destroyAllWindows()
 
+
+cli = main
 
 if __name__ == "__main__":
     main()

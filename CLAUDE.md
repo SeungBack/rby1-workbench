@@ -65,3 +65,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
+---
+
+프로젝트 컨벤션 및 아키텍처: `docs/CONVENTIONS.md` 참고.
