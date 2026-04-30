@@ -103,25 +103,26 @@ robot.dof("right_arm")
 robot.get_ee_pose("right_arm")
 robot.get_torso_pose()
 
-robot.movej(torso=q, right_arm=q, left_arm=q, head=q, minimum_time=5.0)
-robot.ready_pose(minimum_time=5.0)
-robot.zero_pose(minimum_time=5.0)
-robot.joint_impedance_control(right_arm=q, stiffness=100.0, ...)
-robot.move_cartesian(right_arm=T, ...)
+robot.move(mode="joint", torso=q, right_arm=q, left_arm=q, head=q, minimum_time=5.0)
+robot.move(mode="impedance", right_arm=q, stiffness=100.0, ...)
+robot.move(mode="cartesian", right_arm=T, left_arm=T, torso=q)
+robot.ready(minimum_time=5.0)
+robot.zero(minimum_time=5.0)
 
-stream = robot.create_stream()
-robot.head.move(yaw, pitch)
+stream = robot.open_stream(mode="cartesian")
+stream.send(right_arm=T, left_arm=T, torso=q)
+robot.move(mode="joint", head=np.array([yaw, pitch]))
 robot.gripper.set_normalized(right, left)
 ```
 
 자동 pause/resume:
-- `movej()`, `ready_pose()`, `zero_pose()`, `joint_impedance_control()`, `move_cartesian()`은 활성 스트림이 있으면 자동으로 pause/resume 처리한다.
+- `move()`, `ready()`, `zero()`는 활성 스트림이 있으면 자동으로 pause/resume 처리한다.
 - 사용자가 먼저 `stream.pause()`한 상태면 내부 auto-pause는 no-op로 동작한다.
 
 ### RBY1Stream (`robot/stream.py`)
 
 ```python
-stream = robot.create_stream()
+stream = robot.open_stream(mode="cartesian")
 
 stream.send(
     torso=q_torso,
@@ -132,7 +133,7 @@ stream.send(
 
 stream.pause()
 stream.resume()
-stream.cancel()
+stream.close()
 ```
 
 현재 보장하는 동작:
@@ -155,7 +156,7 @@ cfg.model = "a"
 
 robot = RBY1(cfg)
 robot.initialize()
-robot.ready_pose()
+robot.ready()
 ```
 
 ### 사용자 YAML override
@@ -187,9 +188,9 @@ sam_cfg = load_sam3_config("my_sam3.yaml")
 
 ### 프레임 이름
 
-- streaming Cartesian: `link_right_arm_6`, `link_left_arm_6`, `link_torso_5`
-- blocking Cartesian: `ee_right`, `ee_left`
-- FK 계산: `["base", "link_torso_5", "link_right_arm_6", "link_left_arm_6"]`
+- public Cartesian target: `base -> ee_right`, `base -> ee_left`
+- torso pose: `base -> link_torso_5`
+- FK 계산: `["base", "ee_right", "ee_left", "link_torso_5"]`
 
 ### streaming 타이밍
 
@@ -200,6 +201,12 @@ min_time = dt * 1.01
 ```
 
 ## 예제 코드
+
+### `examples/robot_quickstart.py`
+
+- `RBY1`의 최소 direct 사용 예제
+- 기본 실행은 연결 + 상태 조회만 수행
+- `--run-motion`, `--stream-demo`로 `move()` / `open_stream().send()` 흐름 확인
 
 ### `examples/robot_control_basic.py`
 

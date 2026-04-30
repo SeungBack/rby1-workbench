@@ -134,9 +134,9 @@ def main() -> None:
     q_torso    = q_torso_home.copy()
     
     log.info("Moving to home position...")
-    robot.ready_pose()
-    robot.head.move_j(q_head_home)
-    robot.torso.move_j(q_torso_home, mode='position')
+    robot.ready()
+    robot.move(mode="joint", head=q_head_home)
+    robot.move(mode="joint", torso=q_torso_home)
 
     log.info("Ready. Keys: [s] capture  [m] random move  [c] compute  [d] discard  [q] quit")
 
@@ -191,9 +191,9 @@ def main() -> None:
 
                 yaw, pitch = _random_head_pose(q_head_home, ac.yaw_range, ac.pitch_range, rng)
                 log.info("Moving head → yaw=%.1f° pitch=%.1f°", np.rad2deg(yaw), np.rad2deg(pitch))
-                robot.head.move_j(np.array([yaw, pitch]))
+                robot.move(mode="joint", head=np.array([yaw, pitch]))
                 q_torso = _random_torso_pose(q_torso_home, ac.torso_noise, rng)
-                robot.torso.move_j(q_torso, mode='position')
+                robot.move(mode="joint", torso=q_torso)
 
             elif key == ord("c"):
                 if solver.n_samples < calib_cfg.min_samples:

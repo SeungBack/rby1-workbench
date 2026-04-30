@@ -24,8 +24,8 @@ def load_rby1_config(path: str | Path | None = None) -> DictConfig:
 
 
 def load_sam3_config(path: str | Path | None = None) -> DictConfig:
-    """packaged `src/rby1_workbench/conf/realtime_sam3_realsense.yaml`을 로드한다."""
-    default = OmegaConf.load(_package_conf_path("realtime_sam3_realsense.yaml"))
+    """packaged `src/rby1_workbench/conf/sam3.yaml`을 로드한다."""
+    default = OmegaConf.load(_package_conf_path("sam3.yaml"))
     if path is None:
         return default
     return OmegaConf.merge(default, OmegaConf.load(path))

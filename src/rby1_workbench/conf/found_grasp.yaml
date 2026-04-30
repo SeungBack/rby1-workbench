@@ -1,0 +1,15 @@
+camera_source:
+  mode: "server"           # "server" or "direct"
+  name: "head"
+  address: "tcp://127.0.0.1:5550"
+  prefix: "rby1"
+
+found_grasp:
+  foundgrasp_root: "/home/kimm/Workspaces/FoundGrasp"
+  config_path: "paper/dav3l"   # relative to foundgrasp_root/configs/
+  checkpoint_path: ???          # required: absolute path to .pth file
+  device: "cuda"
+
+viz:
+  application_id: "rby1_found_grasp"
+  spawn_viewer: true

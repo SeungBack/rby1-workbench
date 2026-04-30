@@ -7,7 +7,7 @@ import logging
 import hydra
 from omegaconf import DictConfig
 
-from rby1_workbench.perception.realtime_segmentation import run_realtime_sam3_realsense
+from rby1_workbench.perception.sam3_runner import run_sam3
 
 
 logging.basicConfig(
@@ -17,11 +17,11 @@ logging.basicConfig(
 
 @hydra.main(
     config_path="../conf",
-    config_name="realtime_sam3_realsense",
+    config_name="sam3",
     version_base=None,
 )
 def cli(cfg: DictConfig) -> None:
-    run_realtime_sam3_realsense(cfg)
+    run_sam3(cfg)
 
 
 if __name__ == "__main__":

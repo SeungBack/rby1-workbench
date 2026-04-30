@@ -17,7 +17,15 @@ import json
 import logging
 import struct
 import threading
+from multiprocessing import resource_tracker
 from multiprocessing.shared_memory import SharedMemory
+
+
+def _open_shm(name: str) -> SharedMemory:
+    """기존 SHM에 연결하되, resource tracker에서 제외해 프로세스 종료 시 unlink 방지."""
+    shm = SharedMemory(name=name, create=False)
+    resource_tracker.unregister(shm._name, "shared_memory")
+    return shm
 
 import numpy as np
 
@@ -65,15 +73,15 @@ class SharedMemoryCameraStream:
         """
         name, prefix = self._name, self._prefix
         try:
-            self._shm_color = SharedMemory(name=f"{prefix}_{name}_color", create=False)
-            self._shm_meta  = SharedMemory(name=f"{prefix}_{name}_meta",  create=False)
+            self._shm_color = _open_shm(f"{prefix}_{name}_color")
+            self._shm_meta  = _open_shm(f"{prefix}_{name}_meta")
         except FileNotFoundError:
             raise RuntimeError(
                 f"Camera '{name}' shared memory not found. "
                 "Is camera_server.py running?"
             )
         try:
-            self._shm_depth = SharedMemory(name=f"{prefix}_{name}_depth", create=False)
+            self._shm_depth = _open_shm(f"{prefix}_{name}_depth")
         except FileNotFoundError:
             self._shm_depth = None
 

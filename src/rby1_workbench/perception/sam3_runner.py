@@ -15,7 +15,7 @@ from rby1_workbench.perception.visualizer import OpenCVPromptVisualizer
 LOGGER = logging.getLogger(__name__)
 
 
-def run_realtime_sam3_realsense(cfg: DictConfig) -> None:
+def run_sam3(cfg: DictConfig) -> None:
     """Launch the realtime RealSense + SAM3 prompt-and-segment loop."""
     stream = RealSenseStream(cfg.realsense)
     predictor = Sam3RealtimePredictor(cfg.sam3)

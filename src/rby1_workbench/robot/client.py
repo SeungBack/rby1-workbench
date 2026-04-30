@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 import logging
 import threading
 import time
@@ -102,10 +103,15 @@ class RobotStateBuffer:
 
     def _store_state(self, state: Any) -> None:
         raw_timestamp = getattr(state, "timestamp", None)
-        try:
-            timestamp = float(raw_timestamp) if raw_timestamp is not None else time.time()
-        except (TypeError, ValueError):
+        if raw_timestamp is None:
             timestamp = time.time()
+        elif isinstance(raw_timestamp, datetime):
+            timestamp = float(raw_timestamp.timestamp())
+        else:
+            try:
+                timestamp = float(raw_timestamp)
+            except (TypeError, ValueError):
+                timestamp = time.time()
 
         position = np.asarray(state.position, dtype=np.float64).copy()
         with self._lock:

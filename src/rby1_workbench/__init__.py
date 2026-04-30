@@ -4,7 +4,8 @@
 from rby1_workbench.config.schema import load_rby1_config, load_sam3_config, load_calib_config
 
 # Robot wrapper
-from rby1_workbench.robot.rby1 import RBY1
+from rby1_workbench.robot.rby1 import RBY1, RobotModelInfo, RobotStateView
+from rby1_workbench.robot.rpc import RBY1Server
 from rby1_workbench.robot.stream import RBY1Stream
 from rby1_workbench.robot.head import HeadController
 from rby1_workbench.robot.gripper import (
@@ -31,7 +32,7 @@ from rby1_workbench.calibration import (
     HandEyeSolver,
     camera_opticalTforward,
 )
-from rby1_workbench.perception.realtime_segmentation import run_realtime_sam3_realsense
+from rby1_workbench.perception.sam3_runner import run_sam3
 from rby1_workbench.perception.realsense import RealSenseFrame, RealSenseStream
 from rby1_workbench.perception.sam3 import (
     PromptBox,
@@ -53,7 +54,10 @@ __all__ = [
     "load_calib_config",
     # Robot wrapper
     "RBY1",
+    "RBY1Server",
     "RBY1Stream",
+    "RobotModelInfo",
+    "RobotStateView",
     "GripperController",
     "GripperTCPClient",
     "HeadController",
@@ -88,7 +92,7 @@ __all__ = [
     "Sam3Prediction",
     "Sam3PromptState",
     "Sam3RealtimePredictor",
-    "run_realtime_sam3_realsense",
+    "run_sam3",
     # Viz
     "RerunSession",
     "run_visualize_robot",

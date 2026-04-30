@@ -65,23 +65,23 @@ def test_state_reading(robot: RBY1) -> None:
 
 def test_zero_pose(robot: RBY1) -> None:
     step(3, "Zero pose (blocking)")
-    ok_flag = robot.zero_pose(minimum_time=5.0)
-    (ok if ok_flag else fail)(f"zero_pose -> {ok_flag}")
+    ok_flag = robot.zero(minimum_time=5.0)
+    (ok if ok_flag else fail)(f"zero -> {ok_flag}")
 
 
 def test_ready_pose(robot: RBY1) -> None:
     step(4, "Ready pose (blocking)")
-    ok_flag = robot.ready_pose(minimum_time=5.0)
-    (ok if ok_flag else fail)(f"ready_pose -> {ok_flag}")
+    ok_flag = robot.ready(minimum_time=5.0)
+    (ok if ok_flag else fail)(f"ready -> {ok_flag}")
 
 
 def test_head(robot: RBY1) -> None:
     step(5, "Head 제어 (move / zero)")
-    robot.head.move(yaw=0.3, pitch=-0.2, minimum_time=2.0)
-    ok("head.move(yaw=0.3, pitch=-0.2)")
+    robot.move(mode="joint", head=np.array([0.3, -0.2]), minimum_time=2.0)
+    ok("move(mode='joint', head=[0.3, -0.2])")
     time.sleep(0.5)
-    robot.head.zero(minimum_time=2.0)
-    ok("head.zero()")
+    robot.move(mode="joint", head=np.zeros(2), minimum_time=2.0)
+    ok("move(mode='joint', head=[0.0, 0.0])")
 
 
 def test_joint_impedance(robot: RBY1) -> None:
@@ -89,7 +89,8 @@ def test_joint_impedance(robot: RBY1) -> None:
     # ready pose 위치 그대로 impedance mode로 전환 (새 위치로 이동하지 않음)
     q_right = robot.get_joint_positions("right_arm")
     q_left = robot.get_joint_positions("left_arm")
-    ok_flag = robot.joint_impedance_control(
+    ok_flag = robot.move(
+        mode="impedance",
         right_arm=q_right,
         left_arm=q_left,
         stiffness=80.0,
@@ -98,7 +99,7 @@ def test_joint_impedance(robot: RBY1) -> None:
         minimum_time=3.0,
         control_hold_time=3.0,
     )
-    (ok if ok_flag else fail)(f"joint_impedance_control -> {ok_flag}")
+    (ok if ok_flag else fail)(f"move(mode='impedance') -> {ok_flag}")
 
 
 def test_cartesian_streaming(robot: RBY1, cfg) -> None:
@@ -112,7 +113,7 @@ def test_cartesian_streaming(robot: RBY1, cfg) -> None:
     n_ticks = 50
     ok(f"stream.dt={dt}s  ticks={n_ticks}  duration={dt * n_ticks:.1f}s")
 
-    stream = robot.create_stream()
+    stream = robot.open_stream(mode="cartesian")
     try:
         stream.send(torso=q_torso, right_arm=T_right, left_arm=T_left, head=q_head)
         ok("initial send (reset=True 자동)")
@@ -125,8 +126,8 @@ def test_cartesian_streaming(robot: RBY1, cfg) -> None:
 
         ok(f"streaming loop 완료 ({n_ticks} ticks)")
     finally:
-        stream.cancel()
-        ok("stream.cancel()")
+        stream.close()
+        ok("stream.close()")
 
 
 def test_stream_pause_resume(robot: RBY1, cfg) -> None:
@@ -143,7 +144,7 @@ def test_stream_pause_resume(robot: RBY1, cfg) -> None:
     q_head = robot.get_joint_positions("head")
     lock = threading.Lock()
 
-    stream = robot.create_stream()
+    stream = robot.open_stream(mode="cartesian")
 
     def stream_loop() -> None:
         while not stop_event.is_set():
@@ -163,7 +164,7 @@ def test_stream_pause_resume(robot: RBY1, cfg) -> None:
     # blocking command 전: 수동 pause -> blocking -> sync -> resume
     stream.pause()
     ok("stream.pause()")
-    robot.ready_pose(minimum_time=5.0)  # auto-pause: 이미 paused -> no-op
+    robot.ready(minimum_time=5.0)  # auto-pause: 이미 paused -> no-op
     with lock:
         cart_targets["right_arm"] = robot.get_ee_pose("right_arm")
         cart_targets["left_arm"] = robot.get_ee_pose("left_arm")
@@ -175,8 +176,8 @@ def test_stream_pause_resume(robot: RBY1, cfg) -> None:
     time.sleep(1.0)
     stop_event.set()
     t.join(timeout=2.0)
-    stream.cancel()
-    ok("stream thread 종료 + stream.cancel()")
+    stream.close()
+    ok("stream thread 종료 + stream.close()")
 
 
 # ── main ──────────────────────────────────────────────────────────────────────

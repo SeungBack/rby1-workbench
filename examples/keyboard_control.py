@@ -75,7 +75,7 @@ class KeyboardController:
 
     스트림 스레드는 __init__에서 한 번만 생성되어 종료까지 유지됨.
     blocking command(p, z, Enter) 전후 stream.pause()/resume()으로
-    safe하게 전환. robot.movej() 등의 auto-pause와 중복 호출 시에도
+    safe하게 전환. robot.move() 등의 auto-pause와 중복 호출 시에도
     첫 번째 pause만 유효하게 동작함.
     """
 
@@ -102,7 +102,7 @@ class KeyboardController:
         self._targets_lock = threading.Lock()
 
         # 스트림 (한 번 생성 후 유지, pause/resume으로 제어)
-        self._stream: RBY1Stream = robot.create_stream()
+        self._stream: RBY1Stream = robot.open_stream(mode="cartesian")
         self._stop_event = threading.Event()
         self._thread = threading.Thread(target=self._stream_loop, daemon=True)
         self._thread.start()
@@ -110,7 +110,7 @@ class KeyboardController:
     def stop(self) -> None:
         """종료 시 호출. 스레드 종료 및 스트림 취소."""
         self._stop_event.set()
-        self._stream.cancel()
+        self._stream.close()
 
     # ── 스트림 루프 ───────────────────────────────────────────────────
 
@@ -182,11 +182,11 @@ class KeyboardController:
 
         # 공통 커맨드
         if key == ord('p'):
-            ok = self._run_blocking(lambda: self.robot.ready_pose(minimum_time=5.0))
+            ok = self._run_blocking(lambda: self.robot.ready(minimum_time=5.0))
             self.status_msg = "Ready pose" + (" OK" if ok else " FAILED")
             return False
         if key == ord('z'):
-            ok = self._run_blocking(lambda: self.robot.zero_pose(minimum_time=5.0))
+            ok = self._run_blocking(lambda: self.robot.zero(minimum_time=5.0))
             self.status_msg = "Zero pose" + (" OK" if ok else " FAILED")
             return False
         if key == ord(' '):
@@ -275,14 +275,14 @@ class KeyboardController:
         if comp == "head":
             h = self.q_targets["head"].copy()
             ok = self._run_blocking(
-                lambda: self.robot.movej(head=h[:2], minimum_time=3.0)
+                lambda: self.robot.move(mode="joint", head=h[:2], minimum_time=3.0)
             )
         else:
             q_copy = self.q_targets[comp].copy()
             ok = self._run_blocking(
-                lambda: self.robot.movej(**{comp: q_copy}, minimum_time=3.0)
+                lambda: self.robot.move(mode="joint", minimum_time=3.0, **{comp: q_copy})
             )
-        self.status_msg = f"movej {COMPONENT_LABELS[comp]}" + (" OK" if ok else " FAILED")
+        self.status_msg = f"move {COMPONENT_LABELS[comp]}" + (" OK" if ok else " FAILED")
 
     def _sync_targets_from_robot(self) -> None:
         """로봇 현재 상태로 로컬 타겟 동기화. pause 중에 호출됨."""

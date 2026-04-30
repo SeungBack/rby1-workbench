@@ -174,7 +174,7 @@ class ViserKeyboardStylePanel:
         self._joint_ui: dict[tuple[str, int], JointUiState] = {}
         self._cartesian_ui: dict[str, CartesianUiState] = {}
 
-        self._stream = self._robot.create_stream() if self._cartesian_targets else None
+        self._stream = self._robot.open_stream(mode="cartesian") if self._cartesian_targets else None
         self._stream_thread: threading.Thread | None = None
         if self._stream is not None:
             self._stream_thread = threading.Thread(
@@ -245,7 +245,7 @@ class ViserKeyboardStylePanel:
             self._stream_thread.join(timeout=2.0)
         with self._stream_lock:
             if self._stream is not None:
-                self._stream.cancel()
+                self._stream.close()
 
     def spin(self) -> None:
         LOGGER.info(
@@ -523,8 +523,8 @@ class ViserKeyboardStylePanel:
         if not self._cartesian_targets:
             return
         with self._stream_lock:
-            if self._stream is None or self._stream.cancelled:
-                self._stream = self._robot.create_stream()
+            if self._stream is None or self._stream.closed:
+                self._stream = self._robot.open_stream(mode="cartesian")
 
     def _stream_loop(self) -> None:
         interval = 1.0 / self._command_rate_hz
@@ -545,7 +545,7 @@ class ViserKeyboardStylePanel:
                         stream = self._stream
                     if stream is not None:
                         stream.send(**kwargs)
-                        if stream.cancelled:
+                        if stream.closed:
                             self._set_status("Cartesian stream expired; recreating")
                             self._ensure_stream_ready()
                 except Exception as exc:
@@ -581,7 +581,8 @@ class ViserKeyboardStylePanel:
             return
 
         ok = self._run_blocking(
-            lambda: self._robot.movej(
+            lambda: self._robot.move(
+                mode="joint",
                 minimum_time=float(self._cfg.command.body_minimum_time),
                 **body_targets,
             )
@@ -590,8 +591,9 @@ class ViserKeyboardStylePanel:
 
     def _apply_head_target(self, target: np.ndarray) -> bool:
         target = np.asarray(target, dtype=np.float64)
-        return self._robot.head.move_j(
-            np.asarray(target, dtype=float),
+        return self._robot.move(
+            mode="joint",
+            head=np.asarray(target, dtype=float),
             minimum_time=float(self._cfg.command.head_minimum_time),
         )
 
@@ -603,7 +605,8 @@ class ViserKeyboardStylePanel:
             ok = self._run_blocking(lambda: self._apply_head_target(target))
         else:
             ok = self._run_blocking(
-                lambda: self._robot.movej(
+                lambda: self._robot.move(
+                    mode="joint",
                     minimum_time=float(self._cfg.command.body_minimum_time),
                     **{component: target},
                 )
@@ -732,7 +735,8 @@ class ViserKeyboardStylePanel:
     ) -> bool:
         ok = True
         if body_targets:
-            ok = ok and self._robot.movej(
+            ok = ok and self._robot.move(
+                mode="joint",
                 minimum_time=float(self._cfg.command.body_minimum_time),
                 **body_targets,
             )

@@ -100,6 +100,19 @@ def run_visualize_robot(cfg: DictConfig) -> None:
             cam = None
 
     rerun_session.init()
+
+    if cam is not None and cam_K is not None:
+        try:
+            _first = cam.get_frame()
+            H, W = _first.color_rgb.shape[:2]
+            rr.log(
+                f"{cfg.viz.world_frame}/camera",
+                rr.Pinhole(image_from_camera=cam_K, width=W, height=H),
+                static=True,
+            )
+        except Exception as e:
+            logging.warning("Pinhole logging failed: %s", e)
+
     state_buffer.start(cfg.robot.state_update_hz)
 
     logging.info("Streaming robot frames at %.1f Hz", cfg.robot.state_update_hz)
@@ -179,21 +192,32 @@ def run_visualize_robot(cfg: DictConfig) -> None:
                         result.joint_positions_by_name[joint_name],
                     )
 
-            if cam is not None and cam_K is not None and "camera_optical" in result.base_transforms:
+            if cam is not None:
                 try:
                     frame = cam.get_frame()
-                    if frame.depth is not None:
+                    if "camera_optical" in result.base_transforms:
+                        T = result.base_transforms["camera_optical"]
+                        rr.log(
+                            f"{cfg.viz.world_frame}/camera",
+                            rr.Transform3D(translation=T[:3, 3], mat3x3=T[:3, :3]),
+                        )
+                    rr.log(f"{cfg.viz.world_frame}/camera/image", rr.Image(frame.color_rgb))
+                    if (
+                        cam_K is not None
+                        and "camera_optical" in result.base_transforms
+                        and frame.depth is not None
+                    ):
                         _log_pointcloud(
                             frame,
                             cam_K,
                             cam.depth_scale,
                             result.base_transforms["camera_optical"],
-                            f"{cfg.viz.world_frame}/camera/points",
+                            f"{cfg.viz.world_frame}/points",
                             stride=int(getattr(rs_cfg, "pointcloud_stride", 4)),
                             max_depth_m=float(getattr(rs_cfg, "pointcloud_max_depth_m", 3.0)),
                         )
                 except Exception as e:
-                    logging.debug("Point cloud frame skipped: %s", e)
+                    logging.debug("Camera frame skipped: %s", e)
 
             time.sleep(1.0 / cfg.robot.state_update_hz)
     except KeyboardInterrupt:

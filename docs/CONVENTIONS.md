@@ -18,7 +18,8 @@ entry point 이름은 `cli`. argparse 앱은 파일 하단에 `cli = main` alias
 | `rby1-head-camera-calib` | `apps/head_camera_calib.py` |
 | `rby1-visualize-robot` | `apps/visualize_robot.py` |
 | `rby1-viser-joint-control` | `apps/viser_joint_control_panel.py` |
-| `rby1-sam3` | `apps/realtime_sam3_realsense.py` |
+| `rby1-sam3` | `apps/sam3.py` |
+| `rby1-found-grasp` | `apps/found_grasp.py` |
 
 ## Camera 아키텍처
 
